@@ -4,13 +4,20 @@
 //   - Tokenize source via the lexer
 //   - Dispatch each token to the right module
 //   - Resolve user-defined names via the dictionary stack
-//   - Hold the scoping mode flag (Step 10)
+//   - Hold the scoping mode flag and implement the scoping toggle
 //
-// Operator logic lives in stack.rs, arithmetic.rs, dictionary.rs etc.
+// Step 10: Lexical scoping is implemented here.
+//   - Under dynamic scoping (default), procedures look up names in the
+//     live dict stack at call time.
+//   - Under lexical scoping, when a { } block is collected, we snapshot
+//     the current dict stack and store it inside the Procedure value.
+//     When the procedure runs, execute_procedure temporarily swaps in
+//     that snapshot so all name lookups resolve against the definition-time
+//     environment instead of the call-time environment.
 
 use crate::lexer::{Token, tokenize};
 use crate::stack::OperandStack;
-use crate::dictionary::DictStack;
+use crate::dictionary::{Dict, DictStack};
 use crate::types::Value;
 
 pub struct Interpreter {
@@ -21,7 +28,7 @@ pub struct Interpreter {
     pub dicts: DictStack,
 
     /// false = dynamic scoping (PostScript default)
-    /// true  = lexical (static) scoping — toggled in Step 10
+    /// true  = lexical (static) scoping
     pub use_lexical_scoping: bool,
 }
 
@@ -48,22 +55,29 @@ impl Interpreter {
     /// Execute a single token
     pub fn execute_token(&mut self, tokens: &[Token], i: &mut usize) -> Result<(), String> {
         match &tokens[*i] {
-            // ── Literal values: push straight onto the operand stack ──────
             Token::Int(n)         => self.stack.push(Value::Int(*n)),
             Token::Float(f)       => self.stack.push(Value::Float(*f)),
             Token::Bool(b)        => self.stack.push(Value::Bool(*b)),
             Token::StringLit(s)   => self.stack.push(Value::Str(s.clone())),
             Token::LiteralName(n) => self.stack.push(Value::Name(n.clone())),
 
-            // ── Procedure: collect { ... } into a Procedure value ─────────
             Token::ProcStart => {
                 let proc_tokens = self.collect_procedure(tokens, i)?;
-                self.stack.push(Value::Procedure(proc_tokens));
+
+                // Under lexical scoping, snapshot the dict stack now
+                // (at definition time) so the procedure carries its own
+                // closed-over environment with it.
+                let captured_env = if self.use_lexical_scoping {
+                    Some(self.dicts.snapshot())
+                } else {
+                    None
+                };
+
+                self.stack.push(Value::Procedure { tokens: proc_tokens, captured_env });
             }
 
             Token::ProcEnd => return Err("Unexpected '}'".to_string()),
 
-            // ── Named token: try built-ins first, then user dict lookup ───
             Token::Name(name) => {
                 let name = name.clone();
                 self.dispatch(&name, tokens, i)?;
@@ -93,17 +107,41 @@ impl Interpreter {
         Err("Unterminated procedure — missing '}'".to_string())
     }
 
-    /// Execute a procedure (Vec<Token>) — called by if, ifelse, for, repeat
-    pub fn execute_procedure(&mut self, proc_tokens: &[Token]) -> Result<(), String> {
+    /// Execute a procedure's token list.
+    ///
+    /// If the procedure carries a captured environment (lexical scoping),
+    /// we temporarily swap the dict stack for that snapshot so all name
+    /// lookups inside the procedure resolve against the definition-time env.
+    /// After the procedure finishes, the live dict stack is restored.
+    pub fn execute_procedure(&mut self, proc_tokens: &[Token], captured_env: Option<Vec<Dict>>) -> Result<(), String> {
+        if let Some(env) = captured_env {
+            // Save the current live dict stack
+            let live_stack = self.dicts.swap(env);
+
+            // Run the procedure in the captured environment
+            let result = self.run_tokens(proc_tokens);
+
+            // Always restore the live stack, even if there was an error
+            self.dicts.swap(live_stack);
+
+            result
+        } else {
+            // Dynamic scoping — just run against the current live stack
+            self.run_tokens(proc_tokens)
+        }
+    }
+
+    /// Internal helper: run a token slice without touching the dict stack
+    fn run_tokens(&mut self, tokens: &[Token]) -> Result<(), String> {
         let mut i = 0;
-        while i < proc_tokens.len() {
-            self.execute_token(proc_tokens, &mut i)?;
+        while i < tokens.len() {
+            self.execute_token(tokens, &mut i)?;
             i += 1;
         }
         Ok(())
     }
 
-    /// Dispatch a name to a built-in operator, or look it up in the dict stack
+    /// Dispatch a name to a built-in operator or user-defined name
     fn dispatch(&mut self, name: &str, _tokens: &[Token], _i: &mut usize) -> Result<(), String> {
         match name {
             // ── Stack manipulation (stack.rs) ─────────────────────────────
@@ -135,7 +173,7 @@ impl Interpreter {
             "end"       => self.dicts.op_end(),
             "def"       => self.dicts.op_def(&mut self.stack),
 
-            // ── length: routes to string or dict based on top-of-stack type
+            // ── length: routes based on top-of-stack type ─────────────────
             "length" => {
                 match self.stack.peek()? {
                     Value::Str(_)  => self.stack.op_string_length(),
@@ -179,14 +217,12 @@ impl Interpreter {
             "dynamic" => { self.use_lexical_scoping = false; Ok(()) }
 
             // ── User-defined name: look up in dictionary stack ────────────
-            // If the resolved value is a Procedure, execute it.
-            // Otherwise push it onto the operand stack.
             _ => {
                 match self.dicts.lookup(name) {
-                    Some(Value::Procedure(tokens)) => {
-                        // Clone the tokens so we don't hold a borrow on self
+                    Some(Value::Procedure { tokens, captured_env }) => {
                         let tokens = tokens.clone();
-                        self.execute_procedure(&tokens)
+                        let env = captured_env.clone();
+                        self.execute_procedure(&tokens, env)
                     }
                     Some(val) => {
                         self.stack.push(val);
@@ -213,41 +249,64 @@ mod tests {
 
     #[test]
     fn test_def_and_lookup() {
-        // Define x = 42, then push x — should get 42 on the stack
         assert_eq!(run("/x 42 def  x"), vec![Value::Int(42)]);
     }
 
     #[test]
     fn test_def_procedure_and_call() {
-        // Define a procedure that adds 1, call it
         assert_eq!(run("/inc { 1 add } def  5 inc"), vec![Value::Int(6)]);
     }
 
     #[test]
     fn test_begin_end_scope() {
-        // x defined globally, then shadowed inside a begin/end block
         let result = run("
             /x 1 def
             10 dict begin
                 /x 99 def
-                x        % should be 99 here
+                x
             end
-            x            % should be 1 again here
+            x
         ");
         assert_eq!(result, vec![Value::Int(99), Value::Int(1)]);
     }
 
     #[test]
-    fn test_dict_length() {
-        // Create a dict, push it onto the dict stack, define two names,
-        // then end — stack should be empty and nothing should crash
+    fn test_dynamic_scoping_default() {
+        // Under dynamic scoping, getx sees the REDEFINED x = 99
         let result = run("
-            2 dict begin
-            /a 1 def
-            /b 2 def
-            end
+            /x 10 def
+            /getx { x } def
+            /x 99 def
+            getx
         ");
-        assert_eq!(result, vec![]);
+        assert_eq!(result, vec![Value::Int(99)]);
+    }
+
+    #[test]
+    fn test_lexical_scoping_captures_definition_env() {
+        // Under lexical scoping, getx sees x = 10 from when it was defined
+        let result = run("
+            lexical
+            /x 10 def
+            /getx { x } def
+            /x 99 def
+            getx
+        ");
+        assert_eq!(result, vec![Value::Int(10)]);
+    }
+
+    #[test]
+    fn test_dynamic_after_lexical_toggle() {
+        // Switch back to dynamic — should see redefined x = 99 again
+        let result = run("
+            lexical
+            dynamic
+            /x 10 def
+            /getx { x } def
+            /x 99 def
+            getx
+        ");
+        assert_eq!(result, vec![Value::Int(99)]);
     }
 
     #[test]

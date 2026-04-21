@@ -20,7 +20,7 @@ impl Interpreter {
     pub fn op_if(&mut self) -> Result<(), String> {
         // Pop the procedure first (it's on top), then the condition
         let proc = match self.stack.pop()? {
-            Value::Procedure(tokens) => tokens,
+            Value::Procedure { tokens, .. } => tokens,
             other => return Err(format!("if: expected procedure, got {:?}", other)),
         };
         let condition = match self.stack.pop()? {
@@ -29,7 +29,7 @@ impl Interpreter {
         };
 
         if condition {
-            self.execute_procedure(&proc)?;
+            self.execute_procedure(&proc, None)?;
         }
         Ok(())
     }
@@ -41,11 +41,11 @@ impl Interpreter {
     pub fn op_ifelse(&mut self) -> Result<(), String> {
         // Stack order (top to bottom): proc_false, proc_true, bool
         let proc_false = match self.stack.pop()? {
-            Value::Procedure(tokens) => tokens,
+            Value::Procedure { tokens, .. } => tokens,
             other => return Err(format!("ifelse: expected procedure for false branch, got {:?}", other)),
         };
         let proc_true = match self.stack.pop()? {
-            Value::Procedure(tokens) => tokens,
+            Value::Procedure { tokens, .. } => tokens,
             other => return Err(format!("ifelse: expected procedure for true branch, got {:?}", other)),
         };
         let condition = match self.stack.pop()? {
@@ -54,9 +54,9 @@ impl Interpreter {
         };
 
         if condition {
-            self.execute_procedure(&proc_true)?;
+            self.execute_procedure(&proc_true, None)?;
         } else {
-            self.execute_procedure(&proc_false)?;
+            self.execute_procedure(&proc_false, None)?;
         }
         Ok(())
     }
@@ -71,7 +71,7 @@ impl Interpreter {
     /// Works with both integers and floats.
     pub fn op_for(&mut self) -> Result<(), String> {
         let proc = match self.stack.pop()? {
-            Value::Procedure(tokens) => tokens,
+            Value::Procedure { tokens, .. } => tokens,
             other => return Err(format!("for: expected procedure, got {:?}", other)),
         };
         let limit = match self.stack.pop()? {
@@ -116,7 +116,7 @@ impl Interpreter {
                 self.stack.push(Value::Int(counter as i64));
             }
 
-            self.execute_procedure(&proc)?;
+            self.execute_procedure(&proc, None)?;
             counter += increment;
         }
         Ok(())
@@ -128,7 +128,7 @@ impl Interpreter {
     ///   Prints: hihihi
     pub fn op_repeat(&mut self) -> Result<(), String> {
         let proc = match self.stack.pop()? {
-            Value::Procedure(tokens) => tokens,
+            Value::Procedure { tokens, .. } => tokens,
             other => return Err(format!("repeat: expected procedure, got {:?}", other)),
         };
         let n = match self.stack.pop()? {
@@ -137,7 +137,7 @@ impl Interpreter {
         };
 
         for _ in 0..n {
-            self.execute_procedure(&proc)?;
+            self.execute_procedure(&proc, None)?;
         }
         Ok(())
     }

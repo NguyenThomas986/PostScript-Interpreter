@@ -58,7 +58,7 @@ fn postscript_repr(val: &Value) -> String {
         // Names get their leading slash back
         Value::Name(n) => format!("/{}", n),
         // Procedures show as { token token ... }
-        Value::Procedure(tokens) => format!("{{ {:?} }}", tokens),
+        Value::Procedure { tokens, .. } => format!("{{ {:?} }}", tokens),
         // Everything else uses the standard Display impl
         other => format!("{}", other),
     }

@@ -91,6 +91,12 @@ impl DictStack {
         self.stack.clone()
     }
 
+    /// Swap the entire dict stack with a new one, returning the old one.
+    /// Used by execute_procedure to temporarily install a captured environment.
+    pub fn swap(&mut self, new_stack: Vec<Dict>) -> Vec<Dict> {
+        std::mem::replace(&mut self.stack, new_stack)
+    }
+
     /// Return a read-only reference to the stack (used by tests)
     pub fn as_slice(&self) -> &[Dict] {
         &self.stack
