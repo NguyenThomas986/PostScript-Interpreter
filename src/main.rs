@@ -5,6 +5,7 @@
 
 mod lexer;
 mod types;
+mod dictionary;
 mod stack;
 mod arithmetic;
 mod interpreter;
