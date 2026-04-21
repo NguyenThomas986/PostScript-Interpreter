@@ -245,3 +245,4 @@ PostScript-Interpreter/
 ## Author
 
 Thomas Nguyen — CPTS 355, Spring 2026
+Instructor: Subu Kandaswamy
