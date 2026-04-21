@@ -1,8 +1,12 @@
-// main.rs — Entry point for the PostScript interpreter
+// main.rs — Entry point and REPL
 //
-// Declares modules and runs a REPL that feeds user input into the interpreter.
+// Only responsibility: read lines from stdin, hand them to the interpreter,
+// and print the resulting stack. No operator logic lives here.
 
 mod lexer;
+mod types;
+mod stack;
+mod arithmetic;
 mod interpreter;
 
 use std::io::{self, BufRead, Write};
@@ -23,18 +27,16 @@ fn main() {
 
         let mut line = String::new();
         match stdin.lock().read_line(&mut line) {
-            Ok(0) => break, // EOF
+            Ok(0) => break,
             Ok(_) => {
                 let input = line.trim();
                 if input.is_empty() { continue; }
                 if input == "quit" || input == "exit" { break; }
 
-                // Run the input through the interpreter
                 match interp.run(input) {
                     Ok(_) => {
-                        // Print the current stack so the user can see what happened
                         print!("stack: [");
-                        for (idx, val) in interp.operand_stack.iter().enumerate() {
+                        for (idx, val) in interp.stack.as_slice().iter().enumerate() {
                             if idx > 0 { print!(", "); }
                             print!("{}", val);
                         }
@@ -43,10 +45,7 @@ fn main() {
                     Err(e) => eprintln!("Error: {}", e),
                 }
             }
-            Err(e) => {
-                eprintln!("Error reading input: {}", e);
-                break;
-            }
+            Err(e) => { eprintln!("Error reading input: {}", e); break; }
         }
     }
 
