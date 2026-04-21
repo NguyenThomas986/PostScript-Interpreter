@@ -11,6 +11,7 @@ mod arithmetic;
 mod boolean;
 mod strings;
 mod control;
+mod io_ops;
 mod interpreter;
 
 use std::io::{self, BufRead, Write};

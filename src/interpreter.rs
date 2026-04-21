@@ -162,6 +162,11 @@ impl Interpreter {
             "true"  => self.stack.op_true(),
             "false" => self.stack.op_false(),
 
+            // ── I/O operators (io_ops.rs) ─────────────────────────────────
+            "print" => self.stack.op_print(),
+            "="     => self.stack.op_print_pop(),
+            "=="    => self.stack.op_print_repr(),
+
             // ── Flow control (control.rs) ─────────────────────────────────
             "if"     => self.op_if(),
             "ifelse" => self.op_ifelse(),
