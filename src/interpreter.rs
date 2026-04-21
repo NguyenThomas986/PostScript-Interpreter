@@ -136,6 +136,19 @@ impl Interpreter {
             "end"       => self.dicts.op_end(),
             "def"       => self.dicts.op_def(&mut self.stack),
 
+            // ── Boolean & comparison (boolean.rs) ────────────────────────
+            "eq"    => self.stack.op_eq(),
+            "ne"    => self.stack.op_ne(),
+            "ge"    => self.stack.op_ge(),
+            "gt"    => self.stack.op_gt(),
+            "le"    => self.stack.op_le(),
+            "lt"    => self.stack.op_lt(),
+            "and"   => self.stack.op_and(),
+            "or"    => self.stack.op_or(),
+            "not"   => self.stack.op_not(),
+            "true"  => self.stack.op_true(),
+            "false" => self.stack.op_false(),
+
             // ── Scoping toggle ────────────────────────────────────────────
             "lexical" => { self.use_lexical_scoping = true;  Ok(()) }
             "dynamic" => { self.use_lexical_scoping = false; Ok(()) }

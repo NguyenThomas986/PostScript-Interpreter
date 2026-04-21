@@ -8,6 +8,7 @@ mod types;
 mod dictionary;
 mod stack;
 mod arithmetic;
+mod boolean;
 mod interpreter;
 
 use std::io::{self, BufRead, Write};
