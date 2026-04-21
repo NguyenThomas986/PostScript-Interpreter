@@ -162,6 +162,13 @@ impl Interpreter {
             "true"  => self.stack.op_true(),
             "false" => self.stack.op_false(),
 
+            // ── Flow control (control.rs) ─────────────────────────────────
+            "if"     => self.op_if(),
+            "ifelse" => self.op_ifelse(),
+            "for"    => self.op_for(),
+            "repeat" => self.op_repeat(),
+            "quit"   => self.op_quit(),
+
             // ── Scoping toggle ────────────────────────────────────────────
             "lexical" => { self.use_lexical_scoping = true;  Ok(()) }
             "dynamic" => { self.use_lexical_scoping = false; Ok(()) }

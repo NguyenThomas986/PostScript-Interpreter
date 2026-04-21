@@ -10,6 +10,7 @@ mod stack;
 mod arithmetic;
 mod boolean;
 mod strings;
+mod control;
 mod interpreter;
 
 use std::io::{self, BufRead, Write};
@@ -45,6 +46,8 @@ fn main() {
                         }
                         println!("]");
                     }
+                    // quit operator sends a sentinel — exit the REPL cleanly
+                    Err(e) if e == "__quit__" => break,
                     Err(e) => eprintln!("Error: {}", e),
                 }
             }
