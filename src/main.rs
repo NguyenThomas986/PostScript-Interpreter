@@ -9,6 +9,7 @@ mod dictionary;
 mod stack;
 mod arithmetic;
 mod boolean;
+mod strings;
 mod interpreter;
 
 use std::io::{self, BufRead, Write};

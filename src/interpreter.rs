@@ -130,11 +130,24 @@ impl Interpreter {
 
             // ── Dictionary (dictionary.rs) ────────────────────────────────
             "dict"      => self.dicts.op_dict(&mut self.stack),
-            "length"    => self.dicts.op_length(&mut self.stack),
             "maxlength" => self.dicts.op_maxlength(&mut self.stack),
             "begin"     => self.dicts.op_begin(&mut self.stack),
             "end"       => self.dicts.op_end(),
             "def"       => self.dicts.op_def(&mut self.stack),
+
+            // ── length: routes to string or dict based on top-of-stack type
+            "length" => {
+                match self.stack.peek()? {
+                    Value::Str(_)  => self.stack.op_string_length(),
+                    Value::Dict(_) => self.dicts.op_length(&mut self.stack),
+                    other => Err(format!("length: expected string or dict, got {:?}", other)),
+                }
+            }
+
+            // ── String operators (strings.rs) ─────────────────────────────
+            "get"         => self.stack.op_get(),
+            "getinterval" => self.stack.op_getinterval(),
+            "putinterval" => self.stack.op_putinterval(),
 
             // ── Boolean & comparison (boolean.rs) ────────────────────────
             "eq"    => self.stack.op_eq(),
