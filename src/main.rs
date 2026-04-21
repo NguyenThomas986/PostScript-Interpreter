@@ -2,20 +2,11 @@
 //
 // Only responsibility: read lines from stdin, hand them to the interpreter,
 // and print the resulting stack. No operator logic lives here.
+//
+// Modules are declared in lib.rs and shared with integration tests.
 
-mod lexer;
-mod types;
-mod dictionary;
-mod stack;
-mod arithmetic;
-mod boolean;
-mod strings;
-mod control;
-mod io_ops;
-mod interpreter;
-
+use postscript_interpreter::interpreter::Interpreter;
 use std::io::{self, BufRead, Write};
-use interpreter::Interpreter;
 
 fn main() {
     println!("PostScript Interpreter");
@@ -36,7 +27,6 @@ fn main() {
             Ok(_) => {
                 let input = line.trim();
                 if input.is_empty() { continue; }
-                if input == "quit" || input == "exit" { break; }
 
                 match interp.run(input) {
                     Ok(_) => {
@@ -47,7 +37,6 @@ fn main() {
                         }
                         println!("]");
                     }
-                    // quit operator sends a sentinel — exit the REPL cleanly
                     Err(e) if e == "__quit__" => break,
                     Err(e) => eprintln!("Error: {}", e),
                 }

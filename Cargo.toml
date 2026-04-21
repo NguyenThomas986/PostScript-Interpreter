@@ -1,6 +1,14 @@
 [package]
-name = "PostScript-Interpreter"
+name = "postscript-interpreter"
 version = "0.1.0"
 edition = "2024"
+
+[lib]
+name = "postscript_interpreter"
+path = "src/lib.rs"
+
+[[bin]]
+name = "postscript-interpreter"
+path = "src/main.rs"
 
 [dependencies]
