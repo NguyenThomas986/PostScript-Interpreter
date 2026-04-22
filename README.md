@@ -2,8 +2,6 @@
 
 A PostScript interpreter implemented in Rust for CPTS 355: Programming Language Design.
 
----
-
 ## Building and Running
 
 ### Prerequisites
@@ -234,15 +232,26 @@ PostScript-Interpreter/
 ├── Cargo.toml
 ├── README.md
 ├── .gitignore
-└── src/
-    ├── main.rs           # Entry point and REPL loop
-    ├── lexer.rs          # Tokenizer — converts source text to Token stream
-    └── interpreter.rs    # Execution engine — operand stack, dictionary stack, all operators
+├── src/
+│   ├── main.rs           # Entry point and REPL loop
+│   ├── lib.rs            # Library root — re-exports all modules for integration tests
+│   ├── lexer.rs          # Tokenizer — converts source text to Token stream
+│   ├── types.rs          # Shared Value enum used across all modules
+│   ├── stack.rs          # Operand stack + stack manipulation operators
+│   ├── arithmetic.rs     # Arithmetic operators (add, sub, mul, div, etc.)
+│   ├── boolean.rs        # Boolean and comparison operators
+│   ├── strings.rs        # String operators (get, getinterval, putinterval)
+│   ├── dictionary.rs     # Dictionary stack + dictionary operators
+│   ├── control.rs        # Flow control operators (if, ifelse, for, repeat, quit)
+│   ├── io_ops.rs         # I/O operators (print, =, ==)
+│   └── interpreter.rs    # Core execution engine — token dispatch and scoping logic
+└── tests/
+    └── integration_test.rs  # End-to-end tests covering full PostScript programs
 ```
 
 ---
 
 ## Author
 
-Thomas Nguyen — CPTS 355, Spring 2026
+Thomas Nguyen — CPTS 355, Spring 2026  
 Instructor: Subu Kandaswamy
