@@ -6,10 +6,7 @@ use crate::types::Value;
 impl OperandStack {
     pub fn op_print(&mut self) -> Result<(), String> {
         match self.pop()? {
-            Value::Str(s) => {
-                print!("{}", s);
-                Ok(())
-            }
+            Value::Str(s) => { print!("{}", s); Ok(()) }
             other => Err(format!("print: expected string, got {:?}", other)),
         }
     }
@@ -29,11 +26,11 @@ impl OperandStack {
 
 fn postscript_repr(val: &Value) -> String {
     match val {
-        Value::Str(s) => format!("({})", s),
+        Value::Str(s)  => format!("({})", s),
         Value::Name(n) => format!("/{}", n),
         Value::Procedure { tokens, .. } => format!("{{ {:?} }}", tokens),
         Value::Array(items) => {
-            let inner: Vec<String> = items.iter().map(|v| postscript_repr(v)).collect();
+            let inner: Vec<String> = items.iter().map(postscript_repr).collect();
             format!("[{}]", inner.join(" "))
         }
         other => format!("{}", other),

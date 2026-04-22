@@ -20,15 +20,18 @@ pub struct Dict {
 
 impl Dict {
     pub fn new(capacity: usize) -> Self {
-        Dict {
-            capacity,
-            entries: HashMap::new(),
-        }
+        Dict { capacity, entries: HashMap::new() }
     }
 }
 
 pub struct DictStack {
     stack: Vec<Dict>,
+}
+
+impl Default for DictStack {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DictStack {
@@ -49,10 +52,7 @@ impl DictStack {
 
     pub fn define(&mut self, name: String, value: Value) -> Result<(), String> {
         match self.stack.last_mut() {
-            Some(dict) => {
-                dict.entries.insert(name, value);
-                Ok(())
-            }
+            Some(dict) => { dict.entries.insert(name, value); Ok(()) }
             None => Err("def: dictionary stack is empty".to_string()),
         }
     }
@@ -97,14 +97,9 @@ impl DictStack {
     pub fn op_length(&self, stack: &mut OperandStack) -> Result<(), String> {
         match stack.pop()? {
             Value::Dict(d) => stack.push(Value::Int(d.entries.len() as i64)),
-            Value::Str(s) => stack.push(Value::Int(s.len() as i64)),
+            Value::Str(s)  => stack.push(Value::Int(s.len() as i64)),
             Value::Array(a) => stack.push(Value::Int(a.len() as i64)),
-            other => {
-                return Err(format!(
-                    "length: expected dict, string, or array, got {:?}",
-                    other
-                ));
-            }
+            other => return Err(format!("length: expected dict, string, or array, got {:?}", other)),
         }
         Ok(())
     }
@@ -119,10 +114,7 @@ impl DictStack {
 
     pub fn op_begin(&mut self, stack: &mut OperandStack) -> Result<(), String> {
         match stack.pop()? {
-            Value::Dict(d) => {
-                self.begin(d);
-                Ok(())
-            }
+            Value::Dict(d) => { self.begin(d); Ok(()) }
             other => Err(format!("begin: expected dict, got {:?}", other)),
         }
     }
@@ -148,19 +140,14 @@ impl DictStack {
     /// which matches the common usage pattern of immediately continuing to work with it.
     pub fn op_put(&self, stack: &mut OperandStack) -> Result<(), String> {
         let value = stack.pop()?;
-        let key = stack.pop()?;
+        let key   = stack.pop()?;
         let container = stack.pop()?;
         match container {
             Value::Dict(mut d) => {
                 let name = match key {
                     Value::Name(n) => n,
-                    Value::Str(s) => s,
-                    other => {
-                        return Err(format!(
-                            "put: dict key must be name or string, got {:?}",
-                            other
-                        ));
-                    }
+                    Value::Str(s)  => s,
+                    other => return Err(format!("put: dict key must be name or string, got {:?}", other)),
                 };
                 d.entries.insert(name, value);
                 stack.push(Value::Dict(d));
@@ -169,19 +156,10 @@ impl DictStack {
             Value::Array(mut a) => {
                 let idx = match key {
                     Value::Int(n) if n >= 0 => n as usize,
-                    other => {
-                        return Err(format!(
-                            "put: array index must be non-negative int, got {:?}",
-                            other
-                        ));
-                    }
+                    other => return Err(format!("put: array index must be non-negative int, got {:?}", other)),
                 };
                 if idx >= a.len() {
-                    return Err(format!(
-                        "put: index {} out of bounds for array of length {}",
-                        idx,
-                        a.len()
-                    ));
+                    return Err(format!("put: index {} out of bounds for array of length {}", idx, a.len()));
                 }
                 a[idx] = value;
                 stack.push(Value::Array(a));
@@ -202,38 +180,21 @@ impl DictStack {
             Value::Dict(d) => {
                 let name = match key {
                     Value::Name(n) => n,
-                    Value::Str(s) => s,
-                    other => {
-                        return Err(format!(
-                            "get: dict key must be name or string, got {:?}",
-                            other
-                        ));
-                    }
+                    Value::Str(s)  => s,
+                    other => return Err(format!("get: dict key must be name or string, got {:?}", other)),
                 };
                 match d.entries.get(&name) {
-                    Some(v) => {
-                        stack.push(v.clone());
-                        Ok(())
-                    }
+                    Some(v) => { stack.push(v.clone()); Ok(()) }
                     None => Err(format!("get: key '{}' not found in dict", name)),
                 }
             }
             Value::Array(a) => {
                 let idx = match key {
                     Value::Int(n) if n >= 0 => n as usize,
-                    other => {
-                        return Err(format!(
-                            "get: array index must be non-negative int, got {:?}",
-                            other
-                        ));
-                    }
+                    other => return Err(format!("get: array index must be non-negative int, got {:?}", other)),
                 };
                 if idx >= a.len() {
-                    return Err(format!(
-                        "get: index {} out of bounds for array of length {}",
-                        idx,
-                        a.len()
-                    ));
+                    return Err(format!("get: index {} out of bounds for array of length {}", idx, a.len()));
                 }
                 stack.push(a[idx].clone());
                 Ok(())
@@ -253,28 +214,19 @@ impl DictStack {
     /// See Interpreter::op_forall in interpreter.rs for the real implementation.
     pub fn op_forall(&mut self, stack: &mut OperandStack) -> Result<(), String> {
         let proc = match stack.pop()? {
-            Value::Procedure {
-                tokens,
-                captured_env,
-            } => (tokens, captured_env),
+            Value::Procedure { tokens, captured_env } => (tokens, captured_env),
             other => return Err(format!("forall: expected procedure, got {:?}", other)),
         };
         let container = stack.pop()?;
         match container {
             Value::Array(a) => {
                 stack.push(Value::Array(a));
-                stack.push(Value::Procedure {
-                    tokens: proc.0,
-                    captured_env: proc.1,
-                });
+                stack.push(Value::Procedure { tokens: proc.0, captured_env: proc.1 });
                 Err("__forall_array__".to_string())
             }
             Value::Dict(d) => {
                 stack.push(Value::Dict(d));
-                stack.push(Value::Procedure {
-                    tokens: proc.0,
-                    captured_env: proc.1,
-                });
+                stack.push(Value::Procedure { tokens: proc.0, captured_env: proc.1 });
                 Err("__forall_dict__".to_string())
             }
             other => Err(format!("forall: expected array or dict, got {:?}", other)),
