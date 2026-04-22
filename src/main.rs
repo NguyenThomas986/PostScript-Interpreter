@@ -19,13 +19,17 @@ fn main() {
             Ok(0) => break,
             Ok(_) => {
                 let input = line.trim();
-                if input.is_empty() { continue; }
+                if input.is_empty() {
+                    continue;
+                }
 
                 match interp.run(input) {
                     Ok(_) => {
                         print!("stack: [");
                         for (idx, val) in interp.stack.as_slice().iter().enumerate() {
-                            if idx > 0 { print!(", "); }
+                            if idx > 0 {
+                                print!(", ");
+                            }
                             print!("{}", val);
                         }
                         println!("]");
@@ -34,7 +38,10 @@ fn main() {
                     Err(e) => eprintln!("Error: {}", e),
                 }
             }
-            Err(e) => { eprintln!("Error reading input: {}", e); break; }
+            Err(e) => {
+                eprintln!("Error reading input: {}", e);
+                break;
+            }
         }
     }
 
