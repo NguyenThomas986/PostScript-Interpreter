@@ -81,11 +81,21 @@ The current stack is printed after every line.
 
 ### Run Tests
 
+[![CI](https://github.com/nguyenthomas986/PostScript-Interpreter/actions/workflows/ci.yml/badge.svg)](https://github.com/nguyenthomas986/PostScript-Interpreter/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nguyenthomas986/PostScript-Interpreter/graph/badge.svg)](https://codecov.io/gh/nguyenthomas986/PostScript-Interpreter)
+
 ```
 cargo test
 ```
 
 Unit tests live alongside their source files. Integration tests are in `tests/`.
+
+To see a detailed coverage report locally:
+
+```
+cargo llvm-cov --html
+open target/llvm-cov/html/index.html
+```
 
 ---
 
