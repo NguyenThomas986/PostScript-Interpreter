@@ -148,7 +148,11 @@ impl Interpreter {
     /// we temporarily swap the dict stack for that snapshot so all name
     /// lookups inside the procedure resolve against the definition-time env.
     /// After the procedure finishes the live dict stack is restored, even on error.
-    pub fn execute_procedure(&mut self, proc_tokens: &[Token], captured_env: Option<Vec<Dict>>) -> Result<(), String> {
+    pub fn execute_procedure(
+        &mut self,
+        proc_tokens: &[Token],
+        captured_env: Option<Vec<Dict>>,
+    ) -> Result<(), String> {
         if let Some(env) = captured_env {
             // Save the current live dict stack
             let live_stack = self.dicts.swap(env);
@@ -271,7 +275,7 @@ impl Interpreter {
             "cvr"  => self.stack.op_cvr(),
             "cvn"  => self.stack.op_cvn(),
 
-            // ── I/O ───────────────────────────────────────────────────────────
+            // ── I/O ────────────────────────────────────────────────────────────
             "print" => self.stack.op_print(),
             "="     => self.stack.op_print_pop(),
             "=="    => self.stack.op_print_repr(),

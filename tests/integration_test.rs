@@ -13,7 +13,7 @@
 use postscript_interpreter::interpreter::Interpreter;
 use postscript_interpreter::types::Value;
 
-// ── Helper ────────────────────────────────────────────────────────────────────
+// ── Helper ───────────────────────────────────────────────────────────────────
 
 fn run(source: &str) -> Vec<Value> {
     let mut interp = Interpreter::new();
@@ -26,7 +26,7 @@ fn run_err(source: &str) -> String {
     interp.run(source).unwrap_err()
 }
 
-// ── Stack + Arithmetic ────────────────────────────────────────────────────────
+// ── Stack + Arithmetic ───────────────────────────────────────────────────────────
 
 #[test]
 fn test_arithmetic_chain() {
@@ -81,7 +81,7 @@ fn test_begin_end_isolates_scope() {
     assert!(interp.run("x").is_err());
 }
 
-// ── Control Flow ──────────────────────────────────────────────────────────────
+// ── Control Flow ─────────────────────────────────────────────────────────────
 
 #[test]
 fn test_if_with_comparison() {
