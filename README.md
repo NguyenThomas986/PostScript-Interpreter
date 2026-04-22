@@ -2,6 +2,18 @@
 
 A PostScript interpreter implemented in Rust for CPTS 355: Programming Language Design.
 
+## What is PostScript?
+
+PostScript is a stack-based programming language created by [Adobe](https://www.adobe.com/products/postscript.html) that is used to describe how text and graphics should appear on a page.
+
+Instead of just storing an image, a PostScript program gives instructions like:
+
+- where to place text
+- how to draw shapes
+- how to format a page
+
+A PostScript interpreter (like this project) reads those instructions and executes them step by step.
+
 ## Building and Running
 
 ### Prerequisites
