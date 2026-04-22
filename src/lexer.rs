@@ -178,10 +178,8 @@ fn classify_word(word: &str) -> Token {
 
     // 1. Float detection FIRST if it looks like a float
     // (fixes 0.0, 1.0, etc. being misclassified as Int)
-    if word.contains('.') {
-        if let Ok(f) = word.parse::<f64>() {
-            return Token::Float(f);
-        }
+    if word.contains('.') && let Ok(f) = word.parse::<f64>() {
+        return Token::Float(f);
     }
 
     // 2. Integer
