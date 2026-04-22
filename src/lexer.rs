@@ -8,63 +8,22 @@
 
 // ── Token type ───────────────────────────────────────────────────────────────
 
-/// Every distinct kind of value or syntax element in PostScript source code.
-///
-/// Examples:
-///   42          → Token::Int(42)
-///   3.14        → Token::Float(3.14)
-///   true        → Token::Bool(true)
-///   (hello)     → Token::StringLit("hello".to_string())
-///   /foo        → Token::LiteralName("foo".to_string())
-///   add         → Token::Name("add".to_string())
-///   {           → Token::ProcStart
-///   }           → Token::ProcEnd
-///   [           → Token::ArrayStart
-///   ]           → Token::ArrayEnd
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
-    /// A whole number, e.g. 42 or -7
     Int(i64),
-
-    /// A floating-point number, e.g. 3.14 or -2.5
     Float(f64),
-
-    /// The literals `true` or `false`
     Bool(bool),
-
-    /// A parenthesized string, e.g. (hello world) → "hello world"
     StringLit(String),
-
-    /// A name preceded by `/`, e.g. /foo — pushed as data, never executed
     LiteralName(String),
-
-    /// A bare word that will be looked up in the dictionary and executed,
-    /// e.g. add, def, exch, myvar
     Name(String),
-
-    /// The `{` character — marks the beginning of a procedure body
     ProcStart,
-
-    /// The `}` character — marks the end of a procedure body
     ProcEnd,
-
-    /// The `[` character — marks the beginning of an array literal
     ArrayStart,
-
-    /// The `]` character — marks the end of an array literal
     ArrayEnd,
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
-/// Tokenize a PostScript source string into a flat list of Tokens.
-///
-/// The function scans left-to-right, consuming one token per iteration.
-/// Whitespace and `%` comments are skipped silently.
-///
-/// # Errors
-/// Returns an `Err(String)` with a message if the input is malformed
-/// (e.g. an unterminated string literal).
 pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
     let chars: Vec<char> = source.chars().collect();
     let mut tokens = Vec::new();
@@ -74,13 +33,11 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
     while i < n {
         let ch = chars[i];
 
-        // ── Whitespace: skip ─────────────────────────────────────────────
         if ch.is_whitespace() {
             i += 1;
             continue;
         }
 
-        // ── Comments: % … end-of-line — skip the whole line ─────────────
         if ch == '%' {
             while i < n && chars[i] != '\n' {
                 i += 1;
@@ -88,7 +45,6 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
             continue;
         }
 
-        // ── Procedure delimiters ─────────────────────────────────────────
         if ch == '{' {
             tokens.push(Token::ProcStart);
             i += 1;
@@ -100,9 +56,6 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
             continue;
         }
 
-        // ── Array literal delimiters ─────────────────────────────────────
-        // [ and ] are tokenized here; the interpreter handles collecting
-        // the evaluated elements into a Value::Array at execution time.
         if ch == '[' {
             tokens.push(Token::ArrayStart);
             i += 1;
@@ -114,21 +67,16 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
             continue;
         }
 
-        // ── PostScript string literal  ( ... ) ───────────────────────────
-        // Strings may contain nested balanced parentheses.
-        // Backslash escape sequences are also handled.
         if ch == '(' {
-            i += 1; // skip opening '('
+            i += 1;
             let (s, new_i) = read_string(&chars, i, n)?;
             tokens.push(Token::StringLit(s));
             i = new_i;
             continue;
         }
 
-        // ── Literal name  /foo ───────────────────────────────────────────
-        // The slash means "push this name as a value, do not execute it".
         if ch == '/' {
-            i += 1; // skip the '/'
+            i += 1;
             let (word, new_i) = read_word(&chars, i, n);
             if word.is_empty() {
                 return Err("Bare '/' with no name following it".to_string());
@@ -138,9 +86,6 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
             continue;
         }
 
-        // ── Numbers and operator names ───────────────────────────────────
-        // Collect a contiguous run of non-delimiter characters, then decide
-        // what kind of token it is.
         let (word, new_i) = read_word(&chars, i, n);
         if !word.is_empty() {
             tokens.push(classify_word(&word));
@@ -148,7 +93,6 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
             continue;
         }
 
-        // ── Anything unrecognised: skip (should not normally happen) ─────
         i += 1;
     }
 
@@ -157,9 +101,6 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-/// Read characters until a delimiter is hit, return the word and the new index.
-///
-/// Delimiters are: whitespace, `(`, `)`, `{`, `}`, `[`, `]`, `%`
 fn read_word(chars: &[char], start: usize, n: usize) -> (String, usize) {
     let delimiters =
         |c: char| c.is_whitespace() || matches!(c, '(' | ')' | '{' | '}' | '[' | ']' | '%');
@@ -170,42 +111,31 @@ fn read_word(chars: &[char], start: usize, n: usize) -> (String, usize) {
     (chars[start..end].iter().collect(), end)
 }
 
-/// Read the inside of a PostScript string starting just after the opening `(`.
-///
-/// Handles:
-///   - Nested parentheses  (a (b) c)  → "a (b) c"
-///   - Backslash escapes   \n \t \\ \( \)
-///
-/// Returns (string_contents, index_after_closing_paren).
 fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize), String> {
     let mut s = String::new();
     let mut i = start;
-    // depth starts at 1 because we already consumed the opening '('
     let mut depth: usize = 1;
 
     while i < n {
         let c = chars[i];
         match c {
-            // Nested open paren — include it in the string, increase depth
             '(' => {
                 depth += 1;
                 s.push('(');
                 i += 1;
             }
-            // Close paren — either ends the string or closes a nested level
             ')' => {
                 depth -= 1;
                 if depth == 0 {
-                    i += 1; // consume the ')'
+                    i += 1;
                     return Ok((s, i));
                 } else {
                     s.push(')');
                     i += 1;
                 }
             }
-            // Backslash escape sequences
             '\\' => {
-                i += 1; // skip the backslash
+                i += 1;
                 if i < n {
                     let escaped = match chars[i] {
                         'n' => '\n',
@@ -214,13 +144,12 @@ fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize)
                         '\\' => '\\',
                         '(' => '(',
                         ')' => ')',
-                        other => other, // unknown escape: keep the char as-is
+                        other => other,
                     };
                     s.push(escaped);
                     i += 1;
                 }
             }
-            // Ordinary character
             other => {
                 s.push(other);
                 i += 1;
@@ -228,7 +157,6 @@ fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize)
         }
     }
 
-    // If we exit the loop without depth reaching 0, the string was never closed
     Err("Unterminated string literal — missing closing ')'".to_string())
 }
 
@@ -240,22 +168,33 @@ fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize)
 ///   3. Bool     ("true" / "false")
 ///   4. Name     (everything else — operator or user-defined name)
 fn classify_word(word: &str) -> Token {
-    // 1. Try integer first (avoids misclassifying "-3" as a float)
-    if let Ok(n) = word.parse::<i64>() {
-        return Token::Int(n);
-    }
-    // 2. Try float
-    if let Ok(f) = word.parse::<f64>() {
-        return Token::Float(f);
-    }
-    // 3. Boolean literals
+    // 0. Boolean literals FIRST (avoid parsing confusion)
     if word == "true" {
         return Token::Bool(true);
     }
     if word == "false" {
         return Token::Bool(false);
     }
-    // 4. Everything else is a name (operator or user variable)
+
+    // 1. Float detection FIRST if it looks like a float
+    // (fixes 0.0, 1.0, etc. being misclassified as Int)
+    if word.contains('.') {
+        if let Ok(f) = word.parse::<f64>() {
+            return Token::Float(f);
+        }
+    }
+
+    // 2. Integer
+    if let Ok(n) = word.parse::<i64>() {
+        return Token::Int(n);
+    }
+
+    // 3. Float fallback (handles cases like scientific notation)
+    if let Ok(f) = word.parse::<f64>() {
+        return Token::Float(f);
+    }
+
+    // 4. Name
     Token::Name(word.to_string())
 }
 
