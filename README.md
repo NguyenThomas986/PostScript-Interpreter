@@ -4,6 +4,7 @@
 
 [![CI](https://github.com/nguyenthomas986/PostScript-Interpreter/actions/workflows/ci.yml/badge.svg)](https://github.com/nguyenthomas986/PostScript-Interpreter/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/nguyenthomas986/PostScript-Interpreter/graph/badge.svg)](https://codecov.io/gh/nguyenthomas986/PostScript-Interpreter)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
 
