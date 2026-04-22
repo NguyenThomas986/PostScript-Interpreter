@@ -27,9 +27,9 @@
 //     same branch and returns a complete Value::Array before the outer ]
 //     fires.
 
+use crate::dictionary::{Dict, DictStack};
 use crate::lexer::{Token, tokenize};
 use crate::stack::OperandStack;
-use crate::dictionary::{Dict, DictStack};
 use crate::types::Value;
 
 pub struct Interpreter {
@@ -68,10 +68,10 @@ impl Interpreter {
     /// (procedure bodies, array literals).
     pub fn execute_token(&mut self, tokens: &[Token], i: &mut usize) -> Result<(), String> {
         match &tokens[*i] {
-            Token::Int(n)         => self.stack.push(Value::Int(*n)),
-            Token::Float(f)       => self.stack.push(Value::Float(*f)),
-            Token::Bool(b)        => self.stack.push(Value::Bool(*b)),
-            Token::StringLit(s)   => self.stack.push(Value::Str(s.clone())),
+            Token::Int(n) => self.stack.push(Value::Int(*n)),
+            Token::Float(f) => self.stack.push(Value::Float(*f)),
+            Token::Bool(b) => self.stack.push(Value::Bool(*b)),
+            Token::StringLit(s) => self.stack.push(Value::Str(s.clone())),
             Token::LiteralName(n) => self.stack.push(Value::Name(n.clone())),
 
             Token::ProcStart => {
@@ -81,7 +81,10 @@ impl Interpreter {
                 } else {
                     None
                 };
-                self.stack.push(Value::Procedure { tokens: proc_tokens, captured_env });
+                self.stack.push(Value::Procedure {
+                    tokens: proc_tokens,
+                    captured_env,
+                });
             }
 
             Token::ProcEnd => return Err("Unexpected '}'".to_string()),
@@ -96,7 +99,9 @@ impl Interpreter {
                 self.stack.op_mark()?;
                 *i += 1;
                 while *i < tokens.len() {
-                    if tokens[*i] == Token::ArrayEnd { break; }
+                    if tokens[*i] == Token::ArrayEnd {
+                        break;
+                    }
                     self.execute_token(tokens, i)?;
                     *i += 1;
                 }
@@ -110,7 +115,9 @@ impl Interpreter {
                     _ => return Err("array literal: internal error".to_string()),
                 };
                 let mut items = Vec::with_capacity(count);
-                for _ in 0..count { items.push(self.stack.pop()?); }
+                for _ in 0..count {
+                    items.push(self.stack.pop()?);
+                }
                 items.reverse();
                 self.stack.op_cleartomark()?;
                 self.stack.push(Value::Array(items));
@@ -135,10 +142,15 @@ impl Interpreter {
 
         while *i < tokens.len() {
             match &tokens[*i] {
-                Token::ProcStart => { depth += 1; proc_tokens.push(tokens[*i].clone()); }
-                Token::ProcEnd   => {
+                Token::ProcStart => {
+                    depth += 1;
+                    proc_tokens.push(tokens[*i].clone());
+                }
+                Token::ProcEnd => {
                     depth -= 1;
-                    if depth == 0 { return Ok(proc_tokens); }
+                    if depth == 0 {
+                        return Ok(proc_tokens);
+                    }
                     proc_tokens.push(tokens[*i].clone());
                 }
                 other => proc_tokens.push(other.clone()),
@@ -189,49 +201,50 @@ impl Interpreter {
     fn dispatch(&mut self, name: &str, _tokens: &[Token], _i: &mut usize) -> Result<(), String> {
         match name {
             // ── Stack manipulation ────────────────────────────────────────────
-            "exch"         => self.stack.op_exch(),
-            "pop"          => self.stack.op_pop(),
-            "dup"          => self.stack.op_dup(),
-            "copy"         => self.stack.op_copy(),
-            "clear"        => self.stack.op_clear(),
-            "count"        => self.stack.op_count(),
-            "roll"         => self.stack.op_roll(),
-            "index"        => self.stack.op_index(),
-            "mark"         => self.stack.op_mark(),
-            "cleartomark"  => self.stack.op_cleartomark(),
-            "counttomark"  => self.stack.op_counttomark(),
+            "exch" => self.stack.op_exch(),
+            "pop" => self.stack.op_pop(),
+            "dup" => self.stack.op_dup(),
+            "copy" => self.stack.op_copy(),
+            "clear" => self.stack.op_clear(),
+            "count" => self.stack.op_count(),
+            "roll" => self.stack.op_roll(),
+            "index" => self.stack.op_index(),
+            "mark" => self.stack.op_mark(),
+            "cleartomark" => self.stack.op_cleartomark(),
+            "counttomark" => self.stack.op_counttomark(),
 
             // ── Arithmetic ────────────────────────────────────────────────────
-            "add"     => self.stack.op_add(),
-            "sub"     => self.stack.op_sub(),
-            "mul"     => self.stack.op_mul(),
-            "div"     => self.stack.op_div(),
-            "idiv"    => self.stack.op_idiv(),
-            "mod"     => self.stack.op_mod(),
-            "abs"     => self.stack.op_abs(),
-            "neg"     => self.stack.op_neg(),
+            "add" => self.stack.op_add(),
+            "sub" => self.stack.op_sub(),
+            "mul" => self.stack.op_mul(),
+            "div" => self.stack.op_div(),
+            "idiv" => self.stack.op_idiv(),
+            "mod" => self.stack.op_mod(),
+            "abs" => self.stack.op_abs(),
+            "neg" => self.stack.op_neg(),
             "ceiling" => self.stack.op_ceiling(),
-            "floor"   => self.stack.op_floor(),
-            "round"   => self.stack.op_round(),
-            "sqrt"    => self.stack.op_sqrt(),
+            "floor" => self.stack.op_floor(),
+            "round" => self.stack.op_round(),
+            "sqrt" => self.stack.op_sqrt(),
 
             // ── Dictionary ────────────────────────────────────────────────────
-            "dict"      => self.dicts.op_dict(&mut self.stack),
+            "dict" => self.dicts.op_dict(&mut self.stack),
             "maxlength" => self.dicts.op_maxlength(&mut self.stack),
-            "begin"     => self.dicts.op_begin(&mut self.stack),
-            "end"       => self.dicts.op_end(),
-            "def"       => self.dicts.op_def(&mut self.stack),
-            "put"       => self.dicts.op_put(&mut self.stack),
+            "begin" => self.dicts.op_begin(&mut self.stack),
+            "end" => self.dicts.op_end(),
+            "def" => self.dicts.op_def(&mut self.stack),
+            "put" => self.dicts.op_put(&mut self.stack),
 
             // ── length: routes based on top-of-stack type ─────────────────────
-            "length" => {
-                match self.stack.peek()? {
-                    Value::Str(_)   => self.stack.op_string_length(),
-                    Value::Dict(_)  => self.dicts.op_length(&mut self.stack),
-                    Value::Array(_) => self.dicts.op_length(&mut self.stack),
-                    other => Err(format!("length: expected string, dict, or array, got {:?}", other)),
-                }
-            }
+            "length" => match self.stack.peek()? {
+                Value::Str(_) => self.stack.op_string_length(),
+                Value::Dict(_) => self.dicts.op_length(&mut self.stack),
+                Value::Array(_) => self.dicts.op_length(&mut self.stack),
+                other => Err(format!(
+                    "length: expected string, dict, or array, got {:?}",
+                    other
+                )),
+            },
 
             // ── get: routes based on container type ───────────────────────────
             "get" => {
@@ -239,77 +252,89 @@ impl Interpreter {
                 let container_type = {
                     let slice = self.stack.as_slice();
                     let len = slice.len();
-                    if len < 2 { return Err("get: stack underflow".to_string()); }
+                    if len < 2 {
+                        return Err("get: stack underflow".to_string());
+                    }
                     match &slice[len - 2] {
-                        Value::Dict(_)  => "dict",
+                        Value::Dict(_) => "dict",
                         Value::Array(_) => "array",
-                        Value::Str(_)   => "str",
+                        Value::Str(_) => "str",
                         _ => "other",
                     }
                 };
                 match container_type {
-                    "dict"  => self.dicts.op_get_dict(&mut self.stack),
+                    "dict" => self.dicts.op_get_dict(&mut self.stack),
                     "array" => self.stack.op_get(),
-                    "str"   => self.stack.op_get(),
-                    _       => Err("get: expected string, array, or dict".to_string()),
+                    "str" => self.stack.op_get(),
+                    _ => Err("get: expected string, array, or dict".to_string()),
                 }
             }
 
             // ── String / array operators ──────────────────────────────────────
             "getinterval" => self.stack.op_getinterval(),
             "putinterval" => self.stack.op_putinterval(),
-            "string"      => self.stack.op_string(),
-            "array"       => self.stack.op_array(),
+            "string" => self.stack.op_string(),
+            "array" => self.stack.op_array(),
 
             // ── Boolean & comparison ──────────────────────────────────────────
-            "eq"    => self.stack.op_eq(),
-            "ne"    => self.stack.op_ne(),
-            "ge"    => self.stack.op_ge(),
-            "gt"    => self.stack.op_gt(),
-            "le"    => self.stack.op_le(),
-            "lt"    => self.stack.op_lt(),
-            "and"   => self.stack.op_and(),
-            "or"    => self.stack.op_or(),
-            "not"   => self.stack.op_not(),
-            "true"  => self.stack.op_true(),
+            "eq" => self.stack.op_eq(),
+            "ne" => self.stack.op_ne(),
+            "ge" => self.stack.op_ge(),
+            "gt" => self.stack.op_gt(),
+            "le" => self.stack.op_le(),
+            "lt" => self.stack.op_lt(),
+            "and" => self.stack.op_and(),
+            "or" => self.stack.op_or(),
+            "not" => self.stack.op_not(),
+            "true" => self.stack.op_true(),
             "false" => self.stack.op_false(),
 
             // ── Type operators ────────────────────────────────────────────────
             "type" => self.stack.op_type(),
-            "cvs"  => self.stack.op_cvs(),
-            "cvi"  => self.stack.op_cvi(),
-            "cvr"  => self.stack.op_cvr(),
-            "cvn"  => self.stack.op_cvn(),
+            "cvs" => self.stack.op_cvs(),
+            "cvi" => self.stack.op_cvi(),
+            "cvr" => self.stack.op_cvr(),
+            "cvn" => self.stack.op_cvn(),
 
             // ── I/O ────────────────────────────────────────────────────────────
             "print" => self.stack.op_print(),
-            "="     => self.stack.op_print_pop(),
-            "=="    => self.stack.op_print_repr(),
+            "=" => self.stack.op_print_pop(),
+            "==" => self.stack.op_print_repr(),
 
             // ── Flow control ──────────────────────────────────────────────────
-            "if"     => self.op_if(),
+            "if" => self.op_if(),
             "ifelse" => self.op_ifelse(),
-            "for"    => self.op_for(),
+            "for" => self.op_for(),
             "repeat" => self.op_repeat(),
             "forall" => self.op_forall(),
-            "quit"   => self.op_quit(),
+            "quit" => self.op_quit(),
 
             // ── Scoping toggle ────────────────────────────────────────────────
-            "lexical" => { self.use_lexical_scoping = true;  Ok(()) }
-            "dynamic" => { self.use_lexical_scoping = false; Ok(()) }
+            "lexical" => {
+                self.use_lexical_scoping = true;
+                Ok(())
+            }
+            "dynamic" => {
+                self.use_lexical_scoping = false;
+                Ok(())
+            }
 
             // ── User-defined name ─────────────────────────────────────────────
-            _ => {
-                match self.dicts.lookup(name) {
-                    Some(Value::Procedure { tokens, captured_env }) => {
-                        let tokens = tokens.clone();
-                        let env = captured_env.clone();
-                        self.execute_procedure(&tokens, env)
-                    }
-                    Some(val) => { self.stack.push(val); Ok(()) }
-                    None => Err(format!("Unknown name: {}", name)),
+            _ => match self.dicts.lookup(name) {
+                Some(Value::Procedure {
+                    tokens,
+                    captured_env,
+                }) => {
+                    let tokens = tokens.clone();
+                    let env = captured_env.clone();
+                    self.execute_procedure(&tokens, env)
                 }
-            }
+                Some(val) => {
+                    self.stack.push(val);
+                    Ok(())
+                }
+                None => Err(format!("Unknown name: {}", name)),
+            },
         }
     }
 
@@ -329,7 +354,10 @@ impl Interpreter {
     ///   [1 2 3] { 2 mul } forall     → 2 4 6
     pub fn op_forall(&mut self) -> Result<(), String> {
         let (proc_tokens, captured_env) = match self.stack.pop()? {
-            Value::Procedure { tokens, captured_env } => (tokens, captured_env),
+            Value::Procedure {
+                tokens,
+                captured_env,
+            } => (tokens, captured_env),
             other => return Err(format!("forall: expected procedure, got {:?}", other)),
         };
         let container = self.stack.pop()?;
@@ -360,7 +388,10 @@ impl Interpreter {
                 }
                 Ok(())
             }
-            other => Err(format!("forall: expected array, dict, or string, got {:?}", other)),
+            other => Err(format!(
+                "forall: expected array, dict, or string, got {:?}",
+                other
+            )),
         }
     }
 }
@@ -412,7 +443,14 @@ mod tests {
     #[test]
     fn test_array_literal() {
         let result = run("[ 1 2 3 ]");
-        assert_eq!(result, vec![Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)])]);
+        assert_eq!(
+            result,
+            vec![Value::Array(vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::Int(3)
+            ])]
+        );
     }
 
     #[test]
@@ -443,16 +481,29 @@ mod tests {
 
     #[test]
     fn test_counttomark() {
-        assert_eq!(run("mark 1 2 3 counttomark"), vec![
-            Value::Mark, Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(3)
-        ]);
+        assert_eq!(
+            run("mark 1 2 3 counttomark"),
+            vec![
+                Value::Mark,
+                Value::Int(1),
+                Value::Int(2),
+                Value::Int(3),
+                Value::Int(3)
+            ]
+        );
     }
 
     #[test]
     fn test_type_operator() {
         assert_eq!(run("42 type"), vec![Value::Name("integertype".to_string())]);
-        assert_eq!(run("(hi) type"), vec![Value::Name("stringtype".to_string())]);
-        assert_eq!(run("true type"), vec![Value::Name("booleantype".to_string())]);
+        assert_eq!(
+            run("(hi) type"),
+            vec![Value::Name("stringtype".to_string())]
+        );
+        assert_eq!(
+            run("true type"),
+            vec![Value::Name("booleantype".to_string())]
+        );
         assert_eq!(run("3.14 type"), vec![Value::Name("realtype".to_string())]);
     }
 
@@ -482,21 +533,30 @@ mod tests {
 
     #[test]
     fn test_array_op() {
-        assert_eq!(run("3 array"), vec![
-            Value::Array(vec![Value::Int(0), Value::Int(0), Value::Int(0)])
-        ]);
+        assert_eq!(
+            run("3 array"),
+            vec![Value::Array(vec![
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(0)
+            ])]
+        );
     }
 
     #[test]
     fn test_roll() {
-        assert_eq!(run("1 2 3  3 1 roll"), vec![Value::Int(3), Value::Int(1), Value::Int(2)]);
+        assert_eq!(
+            run("1 2 3  3 1 roll"),
+            vec![Value::Int(3), Value::Int(1), Value::Int(2)]
+        );
     }
 
     #[test]
     fn test_index() {
-        assert_eq!(run("1 2 3  1 index"), vec![
-            Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(2)
-        ]);
+        assert_eq!(
+            run("1 2 3  1 index"),
+            vec![Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(2)]
+        );
     }
 
     #[test]

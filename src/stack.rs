@@ -24,42 +24,64 @@ impl OperandStack {
         OperandStack { data: Vec::new() }
     }
 
-    pub fn push(&mut self, val: Value) { self.data.push(val); }
+    pub fn push(&mut self, val: Value) {
+        self.data.push(val);
+    }
 
     pub fn pop(&mut self) -> Result<Value, String> {
         self.data.pop().ok_or_else(|| "Stack underflow".to_string())
     }
 
     pub fn peek(&self) -> Result<&Value, String> {
-        self.data.last().ok_or_else(|| "Stack underflow".to_string())
+        self.data
+            .last()
+            .ok_or_else(|| "Stack underflow".to_string())
     }
 
-    pub fn len(&self) -> usize { self.data.len() }
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
 
-    pub fn is_empty(&self) -> bool { self.data.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
 
-    pub fn as_slice(&self) -> &[Value] { &self.data }
+    pub fn as_slice(&self) -> &[Value] {
+        &self.data
+    }
 
-    pub fn extend(&mut self, vals: Vec<Value>) { self.data.extend(vals); }
+    pub fn extend(&mut self, vals: Vec<Value>) {
+        self.data.extend(vals);
+    }
 
-    pub fn clear(&mut self) { self.data.clear(); }
+    pub fn clear(&mut self) {
+        self.data.clear();
+    }
 
     // ── Stack manipulation operators ──────────────────────────────────────────
 
     /// exch — swap the top two elements
     ///   Before: a b    After: b a
     pub fn op_exch(&mut self) -> Result<(), String> {
-        let b = self.pop()?; let a = self.pop()?;
-        self.push(b); self.push(a); Ok(())
+        let b = self.pop()?;
+        let a = self.pop()?;
+        self.push(b);
+        self.push(a);
+        Ok(())
     }
 
     /// pop — discard top element
-    pub fn op_pop(&mut self) -> Result<(), String> { self.pop()?; Ok(()) }
+    pub fn op_pop(&mut self) -> Result<(), String> {
+        self.pop()?;
+        Ok(())
+    }
 
     /// dup — duplicate top element
     ///   Before: a    After: a a
     pub fn op_dup(&mut self) -> Result<(), String> {
-        let top = self.peek()?.clone(); self.push(top); Ok(())
+        let top = self.peek()?.clone();
+        self.push(top);
+        Ok(())
     }
 
     /// copy — duplicate top n elements in order
@@ -70,14 +92,19 @@ impl OperandStack {
             other => return Err(format!("copy: expected non-negative int, got {:?}", other)),
         };
         let len = self.data.len();
-        if n > len { return Err(format!("copy: requested {} but stack only has {}", n, len)); }
+        if n > len {
+            return Err(format!("copy: requested {} but stack only has {}", n, len));
+        }
         let top_n: Vec<Value> = self.data[len - n..].to_vec();
         self.data.extend(top_n);
         Ok(())
     }
 
     /// clear — remove all elements
-    pub fn op_clear(&mut self) -> Result<(), String> { self.data.clear(); Ok(()) }
+    pub fn op_clear(&mut self) -> Result<(), String> {
+        self.data.clear();
+        Ok(())
+    }
 
     /// count — push the number of elements currently on the stack
     ///   Before: a b c    After: a b c 3
@@ -98,11 +125,20 @@ impl OperandStack {
         };
         let n = match self.pop()? {
             Value::Int(n) if n >= 0 => n as usize,
-            other => return Err(format!("roll: expected non-negative int for n, got {:?}", other)),
+            other => {
+                return Err(format!(
+                    "roll: expected non-negative int for n, got {:?}",
+                    other
+                ));
+            }
         };
-        if n == 0 { return Ok(()); }
+        if n == 0 {
+            return Ok(());
+        }
         let len = self.data.len();
-        if n > len { return Err(format!("roll: n={} but stack only has {}", n, len)); }
+        if n > len {
+            return Err(format!("roll: n={} but stack only has {}", n, len));
+        }
         let start = len - n;
         let slice = &mut self.data[start..];
         // Normalize j into [0, n) so rotate_right never panics
@@ -119,7 +155,9 @@ impl OperandStack {
             other => return Err(format!("index: expected non-negative int, got {:?}", other)),
         };
         let len = self.data.len();
-        if n >= len { return Err(format!("index: {} out of bounds (stack size {})", n, len)); }
+        if n >= len {
+            return Err(format!("index: {} out of bounds (stack size {})", n, len));
+        }
         let val = self.data[len - 1 - n].clone();
         self.push(val);
         Ok(())
@@ -151,7 +189,9 @@ impl OperandStack {
     pub fn op_counttomark(&mut self) -> Result<(), String> {
         let mut count = 0usize;
         for val in self.data.iter().rev() {
-            if *val == Value::Mark { break; }
+            if *val == Value::Mark {
+                break;
+            }
             count += 1;
         }
         if !self.data.contains(&Value::Mark) {
@@ -169,7 +209,8 @@ mod tests {
     #[test]
     fn test_push_pop() {
         let mut s = OperandStack::new();
-        s.push(Value::Int(1)); s.push(Value::Int(2));
+        s.push(Value::Int(1));
+        s.push(Value::Int(2));
         assert_eq!(s.pop().unwrap(), Value::Int(2));
         assert_eq!(s.pop().unwrap(), Value::Int(1));
     }
@@ -183,7 +224,8 @@ mod tests {
     #[test]
     fn test_exch() {
         let mut s = OperandStack::new();
-        s.push(Value::Int(1)); s.push(Value::Int(2));
+        s.push(Value::Int(1));
+        s.push(Value::Int(2));
         s.op_exch().unwrap();
         assert_eq!(s.pop().unwrap(), Value::Int(1));
         assert_eq!(s.pop().unwrap(), Value::Int(2));
@@ -200,7 +242,9 @@ mod tests {
     #[test]
     fn test_copy() {
         let mut s = OperandStack::new();
-        s.push(Value::Int(1)); s.push(Value::Int(2)); s.push(Value::Int(3));
+        s.push(Value::Int(1));
+        s.push(Value::Int(2));
+        s.push(Value::Int(3));
         s.push(Value::Int(2));
         s.op_copy().unwrap();
         assert_eq!(s.len(), 5);
@@ -209,7 +253,8 @@ mod tests {
     #[test]
     fn test_clear() {
         let mut s = OperandStack::new();
-        s.push(Value::Int(1)); s.push(Value::Int(2));
+        s.push(Value::Int(1));
+        s.push(Value::Int(2));
         s.op_clear().unwrap();
         assert_eq!(s.len(), 0);
     }
@@ -217,7 +262,8 @@ mod tests {
     #[test]
     fn test_count() {
         let mut s = OperandStack::new();
-        s.push(Value::Int(1)); s.push(Value::Int(2));
+        s.push(Value::Int(1));
+        s.push(Value::Int(2));
         s.op_count().unwrap();
         assert_eq!(s.pop().unwrap(), Value::Int(2));
     }
@@ -226,8 +272,11 @@ mod tests {
     fn test_roll() {
         // 1 2 3  3 1 roll → 3 1 2
         let mut s = OperandStack::new();
-        s.push(Value::Int(1)); s.push(Value::Int(2)); s.push(Value::Int(3));
-        s.push(Value::Int(3)); s.push(Value::Int(1));
+        s.push(Value::Int(1));
+        s.push(Value::Int(2));
+        s.push(Value::Int(3));
+        s.push(Value::Int(3));
+        s.push(Value::Int(1));
         s.op_roll().unwrap();
         assert_eq!(s.pop().unwrap(), Value::Int(2));
         assert_eq!(s.pop().unwrap(), Value::Int(1));
@@ -238,7 +287,9 @@ mod tests {
     fn test_index() {
         // 1 2 3  1 index → 1 2 3 2
         let mut s = OperandStack::new();
-        s.push(Value::Int(1)); s.push(Value::Int(2)); s.push(Value::Int(3));
+        s.push(Value::Int(1));
+        s.push(Value::Int(2));
+        s.push(Value::Int(3));
         s.push(Value::Int(1));
         s.op_index().unwrap();
         assert_eq!(s.pop().unwrap(), Value::Int(2));
@@ -249,7 +300,8 @@ mod tests {
         let mut s = OperandStack::new();
         s.push(Value::Int(1));
         s.op_mark().unwrap();
-        s.push(Value::Int(2)); s.push(Value::Int(3));
+        s.push(Value::Int(2));
+        s.push(Value::Int(3));
         s.op_cleartomark().unwrap();
         // Only Value::Int(1) should remain
         assert_eq!(s.len(), 1);
@@ -261,7 +313,8 @@ mod tests {
         let mut s = OperandStack::new();
         s.push(Value::Int(1));
         s.op_mark().unwrap();
-        s.push(Value::Int(2)); s.push(Value::Int(3));
+        s.push(Value::Int(2));
+        s.push(Value::Int(3));
         s.op_counttomark().unwrap();
         assert_eq!(s.pop().unwrap(), Value::Int(2));
     }
