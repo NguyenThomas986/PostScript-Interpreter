@@ -75,23 +75,44 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
         let ch = chars[i];
 
         // ── Whitespace: skip ─────────────────────────────────────────────
-        if ch.is_whitespace() { i += 1; continue; }
+        if ch.is_whitespace() {
+            i += 1;
+            continue;
+        }
 
         // ── Comments: % … end-of-line — skip the whole line ─────────────
         if ch == '%' {
-            while i < n && chars[i] != '\n' { i += 1; }
+            while i < n && chars[i] != '\n' {
+                i += 1;
+            }
             continue;
         }
 
         // ── Procedure delimiters ─────────────────────────────────────────
-        if ch == '{' { tokens.push(Token::ProcStart);  i += 1; continue; }
-        if ch == '}' { tokens.push(Token::ProcEnd);    i += 1; continue; }
+        if ch == '{' {
+            tokens.push(Token::ProcStart);
+            i += 1;
+            continue;
+        }
+        if ch == '}' {
+            tokens.push(Token::ProcEnd);
+            i += 1;
+            continue;
+        }
 
         // ── Array literal delimiters ─────────────────────────────────────
         // [ and ] are tokenized here; the interpreter handles collecting
         // the evaluated elements into a Value::Array at execution time.
-        if ch == '[' { tokens.push(Token::ArrayStart); i += 1; continue; }
-        if ch == ']' { tokens.push(Token::ArrayEnd);   i += 1; continue; }
+        if ch == '[' {
+            tokens.push(Token::ArrayStart);
+            i += 1;
+            continue;
+        }
+        if ch == ']' {
+            tokens.push(Token::ArrayEnd);
+            i += 1;
+            continue;
+        }
 
         // ── PostScript string literal  ( ... ) ───────────────────────────
         // Strings may contain nested balanced parentheses.
@@ -140,7 +161,8 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
 ///
 /// Delimiters are: whitespace, `(`, `)`, `{`, `}`, `[`, `]`, `%`
 fn read_word(chars: &[char], start: usize, n: usize) -> (String, usize) {
-    let delimiters = |c: char| c.is_whitespace() || matches!(c, '(' | ')' | '{' | '}' | '[' | ']' | '%');
+    let delimiters =
+        |c: char| c.is_whitespace() || matches!(c, '(' | ')' | '{' | '}' | '[' | ']' | '%');
     let mut end = start;
     while end < n && !delimiters(chars[end]) {
         end += 1;
@@ -165,7 +187,11 @@ fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize)
         let c = chars[i];
         match c {
             // Nested open paren — include it in the string, increase depth
-            '(' => { depth += 1; s.push('('); i += 1; }
+            '(' => {
+                depth += 1;
+                s.push('(');
+                i += 1;
+            }
             // Close paren — either ends the string or closes a nested level
             ')' => {
                 depth -= 1;
@@ -182,8 +208,12 @@ fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize)
                 i += 1; // skip the backslash
                 if i < n {
                     let escaped = match chars[i] {
-                        'n'  => '\n', 't'  => '\t', 'r'  => '\r',
-                        '\\' => '\\', '('  => '(', ')'  => ')',
+                        'n' => '\n',
+                        't' => '\t',
+                        'r' => '\r',
+                        '\\' => '\\',
+                        '(' => '(',
+                        ')' => ')',
                         other => other, // unknown escape: keep the char as-is
                     };
                     s.push(escaped);
@@ -191,7 +221,10 @@ fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize)
                 }
             }
             // Ordinary character
-            other => { s.push(other); i += 1; }
+            other => {
+                s.push(other);
+                i += 1;
+            }
         }
     }
 
@@ -208,12 +241,20 @@ fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize)
 ///   4. Name     (everything else — operator or user-defined name)
 fn classify_word(word: &str) -> Token {
     // 1. Try integer first (avoids misclassifying "-3" as a float)
-    if let Ok(n) = word.parse::<i64>() { return Token::Int(n); }
+    if let Ok(n) = word.parse::<i64>() {
+        return Token::Int(n);
+    }
     // 2. Try float
-    if let Ok(f) = word.parse::<f64>() { return Token::Float(f); }
+    if let Ok(f) = word.parse::<f64>() {
+        return Token::Float(f);
+    }
     // 3. Boolean literals
-    if word == "true"  { return Token::Bool(true); }
-    if word == "false" { return Token::Bool(false); }
+    if word == "true" {
+        return Token::Bool(true);
+    }
+    if word == "false" {
+        return Token::Bool(false);
+    }
     // 4. Everything else is a name (operator or user variable)
     Token::Name(word.to_string())
 }
@@ -261,31 +302,42 @@ mod tests {
     #[test]
     fn test_operator_name() {
         let tokens = tokenize("add exch def").unwrap();
-        assert_eq!(tokens, vec![
-            Token::Name("add".to_string()),
-            Token::Name("exch".to_string()),
-            Token::Name("def".to_string()),
-        ]);
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Name("add".to_string()),
+                Token::Name("exch".to_string()),
+                Token::Name("def".to_string()),
+            ]
+        );
     }
 
     #[test]
     fn test_proc_delimiters() {
         let tokens = tokenize("{ add }").unwrap();
-        assert_eq!(tokens, vec![
-            Token::ProcStart,
-            Token::Name("add".to_string()),
-            Token::ProcEnd,
-        ]);
+        assert_eq!(
+            tokens,
+            vec![
+                Token::ProcStart,
+                Token::Name("add".to_string()),
+                Token::ProcEnd,
+            ]
+        );
     }
 
     #[test]
     fn test_array_delimiters() {
         let tokens = tokenize("[ 1 2 3 ]").unwrap();
-        assert_eq!(tokens, vec![
-            Token::ArrayStart,
-            Token::Int(1), Token::Int(2), Token::Int(3),
-            Token::ArrayEnd,
-        ]);
+        assert_eq!(
+            tokens,
+            vec![
+                Token::ArrayStart,
+                Token::Int(1),
+                Token::Int(2),
+                Token::Int(3),
+                Token::ArrayEnd,
+            ]
+        );
     }
 
     #[test]

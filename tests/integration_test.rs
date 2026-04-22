@@ -54,13 +54,19 @@ fn test_stack_manipulation_chain() {
 #[test]
 fn test_define_and_call_procedure() {
     // Define square, call it
-    assert_eq!(run("/square { dup mul } def  5 square"), vec![Value::Int(25)]);
+    assert_eq!(
+        run("/square { dup mul } def  5 square"),
+        vec![Value::Int(25)]
+    );
 }
 
 #[test]
 fn test_procedure_using_defined_variable() {
     // Procedure that references a defined variable
-    assert_eq!(run("/n 10 def  /addN { n add } def  5 addN"), vec![Value::Int(15)]);
+    assert_eq!(
+        run("/n 10 def  /addN { n add } def  5 addN"),
+        vec![Value::Int(15)]
+    );
 }
 
 #[test]
@@ -91,10 +97,14 @@ fn test_if_with_comparison() {
 
 #[test]
 fn test_ifelse_branches() {
-    assert_eq!(run("3 3 eq { (equal) } { (not equal) } ifelse"),
-        vec![Value::Str("equal".to_string())]);
-    assert_eq!(run("3 4 eq { (equal) } { (not equal) } ifelse"),
-        vec![Value::Str("not equal".to_string())]);
+    assert_eq!(
+        run("3 3 eq { (equal) } { (not equal) } ifelse"),
+        vec![Value::Str("equal".to_string())]
+    );
+    assert_eq!(
+        run("3 4 eq { (equal) } { (not equal) } ifelse"),
+        vec![Value::Str("not equal".to_string())]
+    );
 }
 
 #[test]

@@ -1,10 +1,10 @@
-pub mod lexer;
-pub mod types;
-pub mod dictionary;
-pub mod stack;
 pub mod arithmetic;
 pub mod boolean;
-pub mod strings;
 pub mod control;
-pub mod io_ops;
+pub mod dictionary;
 pub mod interpreter;
+pub mod io_ops;
+pub mod lexer;
+pub mod stack;
+pub mod strings;
+pub mod types;

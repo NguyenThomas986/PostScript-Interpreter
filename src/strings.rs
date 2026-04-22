@@ -29,7 +29,10 @@ impl OperandStack {
     ///   Before: (hello)    After: 5
     pub fn op_string_length(&mut self) -> Result<(), String> {
         match self.pop()? {
-            Value::Str(s) => { self.push(Value::Int(s.len() as i64)); Ok(()) }
+            Value::Str(s) => {
+                self.push(Value::Int(s.len() as i64));
+                Ok(())
+            }
             other => Err(format!("length: expected string, got {:?}", other)),
         }
     }
@@ -43,13 +46,22 @@ impl OperandStack {
     pub fn op_get(&mut self) -> Result<(), String> {
         let index = match self.pop()? {
             Value::Int(n) if n >= 0 => n as usize,
-            other => return Err(format!("get: expected non-negative int index, got {:?}", other)),
+            other => {
+                return Err(format!(
+                    "get: expected non-negative int index, got {:?}",
+                    other
+                ));
+            }
         };
         match self.pop()? {
             Value::Str(s) => {
                 let bytes = s.as_bytes();
                 if index >= bytes.len() {
-                    return Err(format!("get: index {} out of bounds for string of length {}", index, bytes.len()));
+                    return Err(format!(
+                        "get: index {} out of bounds for string of length {}",
+                        index,
+                        bytes.len()
+                    ));
                 }
                 // PostScript get on a string returns the integer character code
                 self.push(Value::Int(bytes[index] as i64));
@@ -57,7 +69,11 @@ impl OperandStack {
             }
             Value::Array(a) => {
                 if index >= a.len() {
-                    return Err(format!("get: index {} out of bounds for array of length {}", index, a.len()));
+                    return Err(format!(
+                        "get: index {} out of bounds for array of length {}",
+                        index,
+                        a.len()
+                    ));
                 }
                 self.push(a[index].clone());
                 Ok(())
@@ -73,30 +89,51 @@ impl OperandStack {
     pub fn op_getinterval(&mut self) -> Result<(), String> {
         let count = match self.pop()? {
             Value::Int(n) if n >= 0 => n as usize,
-            other => return Err(format!("getinterval: expected non-negative count, got {:?}", other)),
+            other => {
+                return Err(format!(
+                    "getinterval: expected non-negative count, got {:?}",
+                    other
+                ));
+            }
         };
         let index = match self.pop()? {
             Value::Int(n) if n >= 0 => n as usize,
-            other => return Err(format!("getinterval: expected non-negative index, got {:?}", other)),
+            other => {
+                return Err(format!(
+                    "getinterval: expected non-negative index, got {:?}",
+                    other
+                ));
+            }
         };
         match self.pop()? {
             Value::Str(s) => {
                 if index + count > s.len() {
-                    return Err(format!("getinterval: range {}..{} out of bounds for string of length {}",
-                        index, index + count, s.len()));
+                    return Err(format!(
+                        "getinterval: range {}..{} out of bounds for string of length {}",
+                        index,
+                        index + count,
+                        s.len()
+                    ));
                 }
                 self.push(Value::Str(s[index..index + count].to_string()));
                 Ok(())
             }
             Value::Array(a) => {
                 if index + count > a.len() {
-                    return Err(format!("getinterval: range {}..{} out of bounds for array of length {}",
-                        index, index + count, a.len()));
+                    return Err(format!(
+                        "getinterval: range {}..{} out of bounds for array of length {}",
+                        index,
+                        index + count,
+                        a.len()
+                    ));
                 }
                 self.push(Value::Array(a[index..index + count].to_vec()));
                 Ok(())
             }
-            other => Err(format!("getinterval: expected string or array, got {:?}", other)),
+            other => Err(format!(
+                "getinterval: expected string or array, got {:?}",
+                other
+            )),
         }
     }
 
@@ -106,17 +143,31 @@ impl OperandStack {
     pub fn op_putinterval(&mut self) -> Result<(), String> {
         let replacement = match self.pop()? {
             Value::Str(s) => s,
-            other => return Err(format!("putinterval: expected replacement string, got {:?}", other)),
+            other => {
+                return Err(format!(
+                    "putinterval: expected replacement string, got {:?}",
+                    other
+                ));
+            }
         };
         let index = match self.pop()? {
             Value::Int(n) if n >= 0 => n as usize,
-            other => return Err(format!("putinterval: expected non-negative index, got {:?}", other)),
+            other => {
+                return Err(format!(
+                    "putinterval: expected non-negative index, got {:?}",
+                    other
+                ));
+            }
         };
         match self.pop()? {
             Value::Str(mut s) => {
                 if index + replacement.len() > s.len() {
-                    return Err(format!("putinterval: replacement at {} of length {} exceeds string length {}",
-                        index, replacement.len(), s.len()));
+                    return Err(format!(
+                        "putinterval: replacement at {} of length {} exceeds string length {}",
+                        index,
+                        replacement.len(),
+                        s.len()
+                    ));
                 }
                 // Replace the bytes in place
                 let bytes = unsafe { s.as_bytes_mut() };
@@ -138,7 +189,12 @@ impl OperandStack {
     pub fn op_string(&mut self) -> Result<(), String> {
         let n = match self.pop()? {
             Value::Int(n) if n >= 0 => n as usize,
-            other => return Err(format!("string: expected non-negative int, got {:?}", other)),
+            other => {
+                return Err(format!(
+                    "string: expected non-negative int, got {:?}",
+                    other
+                ));
+            }
         };
         self.push(Value::Str("\0".repeat(n)));
         Ok(())
@@ -164,7 +220,9 @@ mod tests {
 
     fn stack_with(vals: Vec<Value>) -> OperandStack {
         let mut s = OperandStack::new();
-        for v in vals { s.push(v); }
+        for v in vals {
+            s.push(v);
+        }
         s
     }
 
@@ -194,7 +252,11 @@ mod tests {
 
     #[test]
     fn test_getinterval() {
-        let mut s = stack_with(vec![Value::Str("hello".to_string()), Value::Int(1), Value::Int(3)]);
+        let mut s = stack_with(vec![
+            Value::Str("hello".to_string()),
+            Value::Int(1),
+            Value::Int(3),
+        ]);
         s.op_getinterval().unwrap();
         assert_eq!(s.pop().unwrap(), Value::Str("ell".to_string()));
     }
@@ -202,7 +264,9 @@ mod tests {
     #[test]
     fn test_putinterval() {
         let mut s = stack_with(vec![
-            Value::Str("hello".to_string()), Value::Int(1), Value::Str("XY".to_string()),
+            Value::Str("hello".to_string()),
+            Value::Int(1),
+            Value::Str("XY".to_string()),
         ]);
         s.op_putinterval().unwrap();
         assert_eq!(s.pop().unwrap(), Value::Str("hXYlo".to_string()));
@@ -222,6 +286,9 @@ mod tests {
     fn test_array_op() {
         let mut s = stack_with(vec![Value::Int(3)]);
         s.op_array().unwrap();
-        assert_eq!(s.pop().unwrap(), Value::Array(vec![Value::Int(0), Value::Int(0), Value::Int(0)]));
+        assert_eq!(
+            s.pop().unwrap(),
+            Value::Array(vec![Value::Int(0), Value::Int(0), Value::Int(0)])
+        );
     }
 }

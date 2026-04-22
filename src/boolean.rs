@@ -22,50 +22,60 @@ use crate::types::Value;
 
 impl OperandStack {
     pub fn op_eq(&mut self) -> Result<(), String> {
-        let b = self.pop()?; let a = self.pop()?;
-        self.push(Value::Bool(values_equal(&a, &b))); Ok(())
+        let b = self.pop()?;
+        let a = self.pop()?;
+        self.push(Value::Bool(values_equal(&a, &b)));
+        Ok(())
     }
 
     pub fn op_ne(&mut self) -> Result<(), String> {
-        let b = self.pop()?; let a = self.pop()?;
-        self.push(Value::Bool(!values_equal(&a, &b))); Ok(())
+        let b = self.pop()?;
+        let a = self.pop()?;
+        self.push(Value::Bool(!values_equal(&a, &b)));
+        Ok(())
     }
 
     pub fn op_ge(&mut self) -> Result<(), String> {
         let (a, b) = self.pop_comparable()?;
-        self.push(Value::Bool(a >= b)); Ok(())
+        self.push(Value::Bool(a >= b));
+        Ok(())
     }
 
     pub fn op_gt(&mut self) -> Result<(), String> {
         let (a, b) = self.pop_comparable()?;
-        self.push(Value::Bool(a > b)); Ok(())
+        self.push(Value::Bool(a > b));
+        Ok(())
     }
 
     pub fn op_le(&mut self) -> Result<(), String> {
         let (a, b) = self.pop_comparable()?;
-        self.push(Value::Bool(a <= b)); Ok(())
+        self.push(Value::Bool(a <= b));
+        Ok(())
     }
 
     pub fn op_lt(&mut self) -> Result<(), String> {
         let (a, b) = self.pop_comparable()?;
-        self.push(Value::Bool(a < b)); Ok(())
+        self.push(Value::Bool(a < b));
+        Ok(())
     }
 
     pub fn op_and(&mut self) -> Result<(), String> {
-        let b = self.pop()?; let a = self.pop()?;
+        let b = self.pop()?;
+        let a = self.pop()?;
         match (a, b) {
             (Value::Bool(x), Value::Bool(y)) => self.push(Value::Bool(x && y)),
-            (Value::Int(x),  Value::Int(y))  => self.push(Value::Int(x & y)),
+            (Value::Int(x), Value::Int(y)) => self.push(Value::Int(x & y)),
             (a, b) => return Err(format!("and: incompatible types {:?} {:?}", a, b)),
         }
         Ok(())
     }
 
     pub fn op_or(&mut self) -> Result<(), String> {
-        let b = self.pop()?; let a = self.pop()?;
+        let b = self.pop()?;
+        let a = self.pop()?;
         match (a, b) {
             (Value::Bool(x), Value::Bool(y)) => self.push(Value::Bool(x || y)),
-            (Value::Int(x),  Value::Int(y))  => self.push(Value::Int(x | y)),
+            (Value::Int(x), Value::Int(y)) => self.push(Value::Int(x | y)),
             (a, b) => return Err(format!("or: incompatible types {:?} {:?}", a, b)),
         }
         Ok(())
@@ -74,14 +84,20 @@ impl OperandStack {
     pub fn op_not(&mut self) -> Result<(), String> {
         match self.pop()? {
             Value::Bool(b) => self.push(Value::Bool(!b)),
-            Value::Int(n)  => self.push(Value::Int(!n)),
+            Value::Int(n) => self.push(Value::Int(!n)),
             other => return Err(format!("not: expected bool or int, got {:?}", other)),
         }
         Ok(())
     }
 
-    pub fn op_true(&mut self)  -> Result<(), String> { self.push(Value::Bool(true));  Ok(()) }
-    pub fn op_false(&mut self) -> Result<(), String> { self.push(Value::Bool(false)); Ok(()) }
+    pub fn op_true(&mut self) -> Result<(), String> {
+        self.push(Value::Bool(true));
+        Ok(())
+    }
+    pub fn op_false(&mut self) -> Result<(), String> {
+        self.push(Value::Bool(false));
+        Ok(())
+    }
 
     // ── Type and conversion operators ─────────────────────────────────────────
 
@@ -98,15 +114,15 @@ impl OperandStack {
     pub fn op_type(&mut self) -> Result<(), String> {
         let val = self.pop()?;
         let type_name = match &val {
-            Value::Int(_)        => "integertype",
-            Value::Float(_)      => "realtype",
-            Value::Bool(_)       => "booleantype",
-            Value::Str(_)        => "stringtype",
-            Value::Name(_)       => "nametype",
-            Value::Procedure {..} => "proceduretype",
-            Value::Dict(_)       => "dicttype",
-            Value::Array(_)      => "arraytype",
-            Value::Mark          => "marktype",
+            Value::Int(_) => "integertype",
+            Value::Float(_) => "realtype",
+            Value::Bool(_) => "booleantype",
+            Value::Str(_) => "stringtype",
+            Value::Name(_) => "nametype",
+            Value::Procedure { .. } => "proceduretype",
+            Value::Dict(_) => "dicttype",
+            Value::Array(_) => "arraytype",
+            Value::Mark => "marktype",
         };
         self.push(Value::Name(type_name.to_string()));
         Ok(())
@@ -121,11 +137,11 @@ impl OperandStack {
         let _dest = self.pop()?; // destination buffer — ignored in this implementation
         let val = self.pop()?;
         let s = match &val {
-            Value::Int(n)   => n.to_string(),
+            Value::Int(n) => n.to_string(),
             Value::Float(f) => f.to_string(),
-            Value::Bool(b)  => b.to_string(),
-            Value::Str(s)   => s.clone(),
-            Value::Name(n)  => n.clone(),
+            Value::Bool(b) => b.to_string(),
+            Value::Str(s) => s.clone(),
+            Value::Name(n) => n.clone(),
             other => format!("{}", other),
         };
         self.push(Value::Str(s));
@@ -138,10 +154,12 @@ impl OperandStack {
     ///   (7) cvi  →  7
     pub fn op_cvi(&mut self) -> Result<(), String> {
         match self.pop()? {
-            Value::Int(n)   => self.push(Value::Int(n)),
+            Value::Int(n) => self.push(Value::Int(n)),
             Value::Float(f) => self.push(Value::Int(f as i64)),
-            Value::Str(s)   => {
-                let n = s.trim().parse::<i64>()
+            Value::Str(s) => {
+                let n = s
+                    .trim()
+                    .parse::<i64>()
                     .map_err(|_| format!("cvi: cannot convert '{}' to int", s))?;
                 self.push(Value::Int(n));
             }
@@ -156,10 +174,12 @@ impl OperandStack {
     ///   (3.14) cvr  →  3.14
     pub fn op_cvr(&mut self) -> Result<(), String> {
         match self.pop()? {
-            Value::Int(n)   => self.push(Value::Float(n as f64)),
+            Value::Int(n) => self.push(Value::Float(n as f64)),
             Value::Float(f) => self.push(Value::Float(f)),
-            Value::Str(s)   => {
-                let f = s.trim().parse::<f64>()
+            Value::Str(s) => {
+                let f = s
+                    .trim()
+                    .parse::<f64>()
                     .map_err(|_| format!("cvr: cannot convert '{}' to real", s))?;
                 self.push(Value::Float(f));
             }
@@ -174,7 +194,7 @@ impl OperandStack {
     ///   (foo) cvn  →  /foo
     pub fn op_cvn(&mut self) -> Result<(), String> {
         match self.pop()? {
-            Value::Str(s)  => self.push(Value::Name(s)),
+            Value::Str(s) => self.push(Value::Name(s)),
             Value::Name(n) => self.push(Value::Name(n)),
             other => return Err(format!("cvn: expected string or name, got {:?}", other)),
         }
@@ -182,30 +202,45 @@ impl OperandStack {
     }
 
     fn pop_comparable(&mut self) -> Result<(ComparableValue, ComparableValue), String> {
-        let b = self.pop()?; let a = self.pop()?;
+        let b = self.pop()?;
+        let a = self.pop()?;
         match (a, b) {
-            (Value::Int(x),   Value::Int(y))   => Ok((ComparableValue::Num(x as f64), ComparableValue::Num(y as f64))),
-            (Value::Float(x), Value::Float(y)) => Ok((ComparableValue::Num(x),        ComparableValue::Num(y))),
-            (Value::Int(x),   Value::Float(y)) => Ok((ComparableValue::Num(x as f64), ComparableValue::Num(y))),
-            (Value::Float(x), Value::Int(y))   => Ok((ComparableValue::Num(x),        ComparableValue::Num(y as f64))),
-            (Value::Str(x),   Value::Str(y))   => Ok((ComparableValue::Str(x),        ComparableValue::Str(y))),
+            (Value::Int(x), Value::Int(y)) => Ok((
+                ComparableValue::Num(x as f64),
+                ComparableValue::Num(y as f64),
+            )),
+            (Value::Float(x), Value::Float(y)) => {
+                Ok((ComparableValue::Num(x), ComparableValue::Num(y)))
+            }
+            (Value::Int(x), Value::Float(y)) => {
+                Ok((ComparableValue::Num(x as f64), ComparableValue::Num(y)))
+            }
+            (Value::Float(x), Value::Int(y)) => {
+                Ok((ComparableValue::Num(x), ComparableValue::Num(y as f64)))
+            }
+            (Value::Str(x), Value::Str(y)) => {
+                Ok((ComparableValue::Str(x), ComparableValue::Str(y)))
+            }
             (a, b) => Err(format!("comparison: incompatible types {:?} {:?}", a, b)),
         }
     }
 }
 
 #[derive(PartialEq, PartialOrd)]
-enum ComparableValue { Num(f64), Str(String) }
+enum ComparableValue {
+    Num(f64),
+    Str(String),
+}
 
 fn values_equal(a: &Value, b: &Value) -> bool {
     match (a, b) {
-        (Value::Int(x),   Value::Int(y))   => x == y,
+        (Value::Int(x), Value::Int(y)) => x == y,
         (Value::Float(x), Value::Float(y)) => x == y,
-        (Value::Int(x),   Value::Float(y)) => (*x as f64) == *y,
-        (Value::Float(x), Value::Int(y))   => *x == (*y as f64),
-        (Value::Bool(x),  Value::Bool(y))  => x == y,
-        (Value::Str(x),   Value::Str(y))   => x == y,
-        (Value::Name(x),  Value::Name(y))  => x == y,
+        (Value::Int(x), Value::Float(y)) => (*x as f64) == *y,
+        (Value::Float(x), Value::Int(y)) => *x == (*y as f64),
+        (Value::Bool(x), Value::Bool(y)) => x == y,
+        (Value::Str(x), Value::Str(y)) => x == y,
+        (Value::Name(x), Value::Name(y)) => x == y,
         _ => false,
     }
 }
@@ -216,7 +251,9 @@ mod tests {
 
     fn stack_with(vals: Vec<Value>) -> OperandStack {
         let mut s = OperandStack::new();
-        for v in vals { s.push(v); }
+        for v in vals {
+            s.push(v);
+        }
         s
     }
 
