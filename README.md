@@ -1,5 +1,12 @@
 # PostScript Interpreter
 
+<div align="center">
+
+[![CI](https://github.com/nguyenthomas986/PostScript-Interpreter/actions/workflows/ci.yml/badge.svg)](https://github.com/nguyenthomas986/PostScript-Interpreter/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nguyenthomas986/PostScript-Interpreter/graph/badge.svg)](https://codecov.io/gh/nguyenthomas986/PostScript-Interpreter)
+
+</div>
+
 A PostScript interpreter implemented in Rust for CPTS 355: Programming Language Design.
 
 ## What is PostScript?
@@ -80,9 +87,6 @@ The current stack is printed after every line.
 ---
 
 ### Run Tests
-
-[![CI](https://github.com/nguyenthomas986/PostScript-Interpreter/actions/workflows/ci.yml/badge.svg)](https://github.com/nguyenthomas986/PostScript-Interpreter/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/nguyenthomas986/PostScript-Interpreter/graph/badge.svg)](https://codecov.io/gh/nguyenthomas986/PostScript-Interpreter)
 
 ```
 cargo test
