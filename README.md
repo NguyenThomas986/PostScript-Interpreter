@@ -137,6 +137,27 @@ getx        % returns 10 — captured x at definition time
 
 ---
 
+## Host Language Limitations (Rust)
+
+**`put` on dictionaries**
+PostScript expects dictionaries to behave like shared objects. Mutating a dict through `put` should be visible everywhere that dict is referenced. Rust does not allow this without `Rc<RefCell<>>`, which would have significantly complicated the codebase. Instead, `put` clones the dict, modifies it, and pushes it back onto the stack. This means a dict stored via `def` won't reflect mutations made through `put` on a separate copy.
+
+Example of where behavior differs from standard PostScript:
+```postscript
+5 dict /d exch def   % store dict in /d
+d /x 42 put          % mutate via put
+d /x get             % standard PS returns 42; this interpreter errors
+```
+
+**`putinterval` on strings**
+PostScript strings are raw byte arrays that support in-place modification. Rust strings are UTF-8 encoded and do not allow direct byte mutation safely. To work around this, the implementation uses `unsafe { as_bytes_mut() }` to mutate the bytes directly. This works correctly for ASCII content (which is all standard PostScript uses), but could behave unexpectedly with non-ASCII input.
+
+Example of where behavior differs:
+```postscript
+(hello) 1 (XY) putinterval   % returns (hXYlo) correctly for ASCII
+(héllo) 1 (XY) putinterval   % may corrupt bytes due to multi-byte UTF-8 chars
+```
+
 ## Supported Commands
 
 ### Stack Manipulation
