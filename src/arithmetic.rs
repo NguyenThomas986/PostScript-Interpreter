@@ -1,19 +1,9 @@
 // arithmetic.rs — Arithmetic operators
-//
-// Implements all math operators as methods on OperandStack.
-// Separated here so interpreter.rs stays focused on dispatch and control flow.
-//
-// Operators: add, sub, mul, div, idiv, mod, abs, neg, ceiling, floor, round, sqrt
 
 use crate::stack::OperandStack;
 use crate::types::Value;
 
 impl OperandStack {
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /// Pop two numeric values. Returns (a, b, is_float) where is_float is true
-    /// if either operand was a Float — used to decide the result type.
-    /// PostScript rule: Int op Int → Int, any Float involved → Float.
     fn pop_two_numeric(&mut self) -> Result<(f64, f64, bool), String> {
         let b = self.pop()?;
         let a = self.pop()?;
@@ -28,7 +18,6 @@ impl OperandStack {
         Ok((to_f64(a)?, to_f64(b)?, is_float))
     }
 
-    /// Pop one numeric value as f64
     fn pop_numeric(&mut self) -> Result<f64, String> {
         match self.pop()? {
             Value::Int(n)   => Ok(n as f64),
@@ -37,47 +26,32 @@ impl OperandStack {
         }
     }
 
-    /// Push a numeric result as Int or Float based on the is_float flag
     fn push_numeric(&mut self, value: f64, is_float: bool) {
-        if is_float {
-            self.push(Value::Float(value));
-        } else {
-            self.push(Value::Int(value as i64));
-        }
+        if is_float { self.push(Value::Float(value)); }
+        else { self.push(Value::Int(value as i64)); }
     }
 
-    // ── Binary operators ──────────────────────────────────────────────────────
-
-    /// add — num1 num2 → num1+num2
     pub fn op_add(&mut self) -> Result<(), String> {
         let (a, b, is_float) = self.pop_two_numeric()?;
-        self.push_numeric(a + b, is_float);
-        Ok(())
+        self.push_numeric(a + b, is_float); Ok(())
     }
 
-    /// sub — num1 num2 → num1-num2
     pub fn op_sub(&mut self) -> Result<(), String> {
         let (a, b, is_float) = self.pop_two_numeric()?;
-        self.push_numeric(a - b, is_float);
-        Ok(())
+        self.push_numeric(a - b, is_float); Ok(())
     }
 
-    /// mul — num1 num2 → num1*num2
     pub fn op_mul(&mut self) -> Result<(), String> {
         let (a, b, is_float) = self.pop_two_numeric()?;
-        self.push_numeric(a * b, is_float);
-        Ok(())
+        self.push_numeric(a * b, is_float); Ok(())
     }
 
-    /// div — num1 num2 → num1/num2  (always float)
     pub fn op_div(&mut self) -> Result<(), String> {
         let (a, b, _) = self.pop_two_numeric()?;
         if b == 0.0 { return Err("div: division by zero".to_string()); }
-        self.push(Value::Float(a / b));
-        Ok(())
+        self.push(Value::Float(a / b)); Ok(())
     }
 
-    /// idiv — int1 int2 → int1/int2  (integer truncated toward zero)
     pub fn op_idiv(&mut self) -> Result<(), String> {
         let b = match self.pop()? {
             Value::Int(n) => n,
@@ -88,11 +62,9 @@ impl OperandStack {
             other => return Err(format!("idiv: expected int, got {:?}", other)),
         };
         if b == 0 { return Err("idiv: division by zero".to_string()); }
-        self.push(Value::Int(a / b));
-        Ok(())
+        self.push(Value::Int(a / b)); Ok(())
     }
 
-    /// mod — int1 int2 → int1 mod int2
     pub fn op_mod(&mut self) -> Result<(), String> {
         let b = match self.pop()? {
             Value::Int(n) => n,
@@ -103,13 +75,9 @@ impl OperandStack {
             other => return Err(format!("mod: expected int, got {:?}", other)),
         };
         if b == 0 { return Err("mod: division by zero".to_string()); }
-        self.push(Value::Int(a % b));
-        Ok(())
+        self.push(Value::Int(a % b)); Ok(())
     }
 
-    // ── Unary operators ───────────────────────────────────────────────────────
-
-    /// abs — num → |num|
     pub fn op_abs(&mut self) -> Result<(), String> {
         match self.pop()? {
             Value::Int(n)   => self.push(Value::Int(n.abs())),
@@ -119,7 +87,6 @@ impl OperandStack {
         Ok(())
     }
 
-    /// neg — num → -num
     pub fn op_neg(&mut self) -> Result<(), String> {
         match self.pop()? {
             Value::Int(n)   => self.push(Value::Int(-n)),
@@ -129,7 +96,6 @@ impl OperandStack {
         Ok(())
     }
 
-    /// ceiling — num → smallest integer >= num
     pub fn op_ceiling(&mut self) -> Result<(), String> {
         match self.pop()? {
             Value::Int(n)   => self.push(Value::Int(n)),
@@ -139,7 +105,6 @@ impl OperandStack {
         Ok(())
     }
 
-    /// floor — num → greatest integer <= num
     pub fn op_floor(&mut self) -> Result<(), String> {
         match self.pop()? {
             Value::Int(n)   => self.push(Value::Int(n)),
@@ -149,7 +114,6 @@ impl OperandStack {
         Ok(())
     }
 
-    /// round — num → nearest integer (0.5 rounds up)
     pub fn op_round(&mut self) -> Result<(), String> {
         match self.pop()? {
             Value::Int(n)   => self.push(Value::Int(n)),
@@ -159,16 +123,12 @@ impl OperandStack {
         Ok(())
     }
 
-    /// sqrt — num → sqrt(num)  (always float)
     pub fn op_sqrt(&mut self) -> Result<(), String> {
         let n = self.pop_numeric()?;
         if n < 0.0 { return Err("sqrt: cannot take sqrt of negative number".to_string()); }
-        self.push(Value::Float(n.sqrt()));
-        Ok(())
+        self.push(Value::Float(n.sqrt())); Ok(())
     }
 }
-
-// ── Unit tests ────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {

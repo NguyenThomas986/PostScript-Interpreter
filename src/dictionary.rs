@@ -1,19 +1,17 @@
 // dictionary.rs — Dictionary stack and dictionary operators
 //
-// Owns the dictionary stack (Vec<HashMap<String, Value>>) and implements:
-//   dict, length, maxlength, begin, end, def
+// Owns the dictionary stack (Vec<Dict>) and implements:
+//   dict, length, maxlength, begin, end, def   — original operators
+//   put                                         — store by key (dicts) or index (arrays)
+//   get (dict/array variant)                    — retrieve by key or index
+//   forall (scaffolding)                        — iteration; full execution in interpreter.rs
 //
 // Also exposes lookup() which walks the stack top-to-bottom to resolve names.
-// This is the foundation of both dynamic and lexical scoping (Step 10).
+// This is the foundation of both dynamic and lexical scoping.
 
 use crate::types::Value;
 use std::collections::HashMap;
 
-// ── Dictionary value ──────────────────────────────────────────────────────────
-
-/// A PostScript dictionary — a key/value store with a fixed capacity.
-/// We track `capacity` separately because PostScript's `maxlength` operator
-/// returns the capacity the dict was created with, not how many entries it has.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Dict {
     pub capacity: usize,
@@ -22,38 +20,22 @@ pub struct Dict {
 
 impl Dict {
     pub fn new(capacity: usize) -> Self {
-        Dict {
-            capacity,
-            entries: HashMap::new(),
-        }
+        Dict { capacity, entries: HashMap::new() }
     }
 }
 
-// ── Dictionary stack ──────────────────────────────────────────────────────────
-
 pub struct DictStack {
-    /// The stack of dictionaries. The LAST element is the current (innermost) scope.
     stack: Vec<Dict>,
 }
 
 impl DictStack {
     pub fn new() -> Self {
-        // Start with one global dictionary on the stack so `def` always has
-        // somewhere to write even before the user calls `begin`.
         let mut ds = DictStack { stack: Vec::new() };
-        ds.stack.push(Dict::new(256)); // global dict
+        ds.stack.push(Dict::new(256));
         ds
     }
 
-    // ── Core lookup ───────────────────────────────────────────────────────────
-
-    /// Look up a name by walking the dictionary stack from top (innermost)
-    /// to bottom (outermost). Returns the first match found, or None.
-    ///
-    /// This implements dynamic scoping — the call-time stack is searched.
-    /// Lexical scoping (Step 10) will snapshot this stack at definition time.
     pub fn lookup(&self, name: &str) -> Option<Value> {
-        // Walk from the top of the stack downward
         for dict in self.stack.iter().rev() {
             if let Some(val) = dict.entries.get(name) {
                 return Some(val.clone());
@@ -62,8 +44,6 @@ impl DictStack {
         None
     }
 
-    /// Define a name in the topmost (current) dictionary.
-    /// This is what `def` does.
     pub fn define(&mut self, name: String, value: Value) -> Result<(), String> {
         match self.stack.last_mut() {
             Some(dict) => { dict.entries.insert(name, value); Ok(()) }
@@ -71,14 +51,11 @@ impl DictStack {
         }
     }
 
-    /// Push a dictionary onto the stack (the `begin` operator)
     pub fn begin(&mut self, dict: Dict) {
         self.stack.push(dict);
     }
 
-    /// Pop the topmost dictionary off the stack (the `end` operator)
     pub fn end(&mut self) -> Result<(), String> {
-        // Never pop the last (global) dictionary
         if self.stack.len() <= 1 {
             return Err("end: cannot pop the global dictionary".to_string());
         }
@@ -86,55 +63,41 @@ impl DictStack {
         Ok(())
     }
 
-    /// Return a snapshot of the entire stack — used for lexical scoping (Step 10)
     pub fn snapshot(&self) -> Vec<Dict> {
         self.stack.clone()
     }
 
-    /// Swap the entire dict stack with a new one, returning the old one.
-    /// Used by execute_procedure to temporarily install a captured environment.
     pub fn swap(&mut self, new_stack: Vec<Dict>) -> Vec<Dict> {
         std::mem::replace(&mut self.stack, new_stack)
     }
 
-    /// Return a read-only reference to the stack (used by tests)
     pub fn as_slice(&self) -> &[Dict] {
         &self.stack
     }
 }
 
-// ── Dictionary operators (called from interpreter dispatch) ───────────────────
-
 use crate::stack::OperandStack;
 
 impl DictStack {
-    /// dict — pop integer capacity, push a new empty dictionary onto operand stack
-    ///   Before: n
-    ///   After:  dict  (a new dictionary with capacity n)
     pub fn op_dict(&self, stack: &mut OperandStack) -> Result<(), String> {
         let n = match stack.pop()? {
             Value::Int(n) if n >= 0 => n as usize,
             other => return Err(format!("dict: expected non-negative int, got {:?}", other)),
         };
-        // We represent a dict on the operand stack as a special Value.
-        // For now we push a placeholder — full dict-as-value support comes with begin/end.
         stack.push(Value::Dict(Dict::new(n)));
         Ok(())
     }
 
-    /// length — pop a dict or string, push its current number of entries / characters
-    ///   Before: dict   After: int
     pub fn op_length(&self, stack: &mut OperandStack) -> Result<(), String> {
         match stack.pop()? {
             Value::Dict(d) => stack.push(Value::Int(d.entries.len() as i64)),
             Value::Str(s)  => stack.push(Value::Int(s.len() as i64)),
-            other => return Err(format!("length: expected dict or string, got {:?}", other)),
+            Value::Array(a) => stack.push(Value::Int(a.len() as i64)),
+            other => return Err(format!("length: expected dict, string, or array, got {:?}", other)),
         }
         Ok(())
     }
 
-    /// maxlength — pop a dict, push its capacity
-    ///   Before: dict   After: int
     pub fn op_maxlength(&self, stack: &mut OperandStack) -> Result<(), String> {
         match stack.pop()? {
             Value::Dict(d) => stack.push(Value::Int(d.capacity as i64)),
@@ -143,10 +106,6 @@ impl DictStack {
         Ok(())
     }
 
-    /// begin — pop a dict from the operand stack and push it onto the dict stack
-    ///   Before (operand): dict
-    ///   After  (operand): (empty)
-    ///   After  (dict stack): dict is now the current scope
     pub fn op_begin(&mut self, stack: &mut OperandStack) -> Result<(), String> {
         match stack.pop()? {
             Value::Dict(d) => { self.begin(d); Ok(()) }
@@ -154,14 +113,10 @@ impl DictStack {
         }
     }
 
-    /// end — pop the current dictionary off the dict stack
     pub fn op_end(&mut self) -> Result<(), String> {
         self.end()
     }
 
-    /// def — pop value and name, bind name → value in the current dictionary
-    ///   Before: /name value
-    ///   After:  (empty)
     pub fn op_def(&mut self, stack: &mut OperandStack) -> Result<(), String> {
         let value = stack.pop()?;
         let name = match stack.pop()? {
@@ -170,9 +125,108 @@ impl DictStack {
         };
         self.define(name, value)
     }
-}
 
-// ── Unit tests ────────────────────────────────────────────────────────────────
+    /// put — container key value →  (mutates container and leaves it on the stack)
+    /// For dicts:  dict /key value put
+    /// For arrays: array index value put
+    ///
+    /// Note: this implementation leaves the modified container on the operand stack,
+    /// which matches the common usage pattern of immediately continuing to work with it.
+    pub fn op_put(&self, stack: &mut OperandStack) -> Result<(), String> {
+        let value = stack.pop()?;
+        let key   = stack.pop()?;
+        let container = stack.pop()?;
+        match container {
+            Value::Dict(mut d) => {
+                let name = match key {
+                    Value::Name(n) => n,
+                    Value::Str(s)  => s,
+                    other => return Err(format!("put: dict key must be name or string, got {:?}", other)),
+                };
+                d.entries.insert(name, value);
+                stack.push(Value::Dict(d));
+                Ok(())
+            }
+            Value::Array(mut a) => {
+                let idx = match key {
+                    Value::Int(n) if n >= 0 => n as usize,
+                    other => return Err(format!("put: array index must be non-negative int, got {:?}", other)),
+                };
+                if idx >= a.len() {
+                    return Err(format!("put: index {} out of bounds for array of length {}", idx, a.len()));
+                }
+                a[idx] = value;
+                stack.push(Value::Array(a));
+                Ok(())
+            }
+            other => Err(format!("put: expected dict or array, got {:?}", other)),
+        }
+    }
+
+    /// get — dict/array key → value
+    /// For dicts:  look up a value by name or string key.
+    /// For arrays: return the element at the given integer index.
+    /// (String get and plain array get are handled in strings.rs.)
+    pub fn op_get_dict(&self, stack: &mut OperandStack) -> Result<(), String> {
+        let key = stack.pop()?;
+        let container = stack.pop()?;
+        match container {
+            Value::Dict(d) => {
+                let name = match key {
+                    Value::Name(n) => n,
+                    Value::Str(s)  => s,
+                    other => return Err(format!("get: dict key must be name or string, got {:?}", other)),
+                };
+                match d.entries.get(&name) {
+                    Some(v) => { stack.push(v.clone()); Ok(()) }
+                    None => Err(format!("get: key '{}' not found in dict", name)),
+                }
+            }
+            Value::Array(a) => {
+                let idx = match key {
+                    Value::Int(n) if n >= 0 => n as usize,
+                    other => return Err(format!("get: array index must be non-negative int, got {:?}", other)),
+                };
+                if idx >= a.len() {
+                    return Err(format!("get: index {} out of bounds for array of length {}", idx, a.len()));
+                }
+                stack.push(a[idx].clone());
+                Ok(())
+            }
+            other => Err(format!("get: expected dict or array, got {:?}", other)),
+        }
+    }
+
+    /// forall — array/dict/string proc →
+    /// Iterate over a container and execute proc for each element.
+    ///
+    /// This method is a thin scaffold that re-pushes the container and
+    /// procedure and signals the interpreter via a sentinel error so the
+    /// full execution (which requires calling execute_procedure) can happen
+    /// in interpreter.rs where the Interpreter struct is in scope.
+    ///
+    /// See Interpreter::op_forall in interpreter.rs for the real implementation.
+    pub fn op_forall(&mut self, stack: &mut OperandStack) -> Result<(), String> {
+        let proc = match stack.pop()? {
+            Value::Procedure { tokens, captured_env } => (tokens, captured_env),
+            other => return Err(format!("forall: expected procedure, got {:?}", other)),
+        };
+        let container = stack.pop()?;
+        match container {
+            Value::Array(a) => {
+                stack.push(Value::Array(a));
+                stack.push(Value::Procedure { tokens: proc.0, captured_env: proc.1 });
+                Err("__forall_array__".to_string())
+            }
+            Value::Dict(d) => {
+                stack.push(Value::Dict(d));
+                stack.push(Value::Procedure { tokens: proc.0, captured_env: proc.1 });
+                Err("__forall_dict__".to_string())
+            }
+            other => Err(format!("forall: expected array or dict, got {:?}", other)),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -194,17 +248,10 @@ mod tests {
     #[test]
     fn test_inner_scope_shadows_outer() {
         let mut ds = DictStack::new();
-        // Define x = 1 in the global dict
         ds.define("x".to_string(), Value::Int(1)).unwrap();
-
-        // Push a new inner dict and define x = 99 there
         ds.begin(Dict::new(10));
         ds.define("x".to_string(), Value::Int(99)).unwrap();
-
-        // Lookup should find the inner x first
         assert_eq!(ds.lookup("x"), Some(Value::Int(99)));
-
-        // After end(), we should see the outer x again
         ds.end().unwrap();
         assert_eq!(ds.lookup("x"), Some(Value::Int(1)));
     }
@@ -219,29 +266,22 @@ mod tests {
     fn test_op_def_and_lookup() {
         let mut ds = DictStack::new();
         let mut stack = OperandStack::new();
-
-        // Push /x 42 then call def
         stack.push(Value::Name("x".to_string()));
         stack.push(Value::Int(42));
         ds.op_def(&mut stack).unwrap();
-
         assert_eq!(ds.lookup("x"), Some(Value::Int(42)));
-        assert_eq!(stack.len(), 0); // def consumed both values
+        assert_eq!(stack.len(), 0);
     }
 
     #[test]
     fn test_op_dict_begin_end() {
         let mut ds = DictStack::new();
         let mut stack = OperandStack::new();
-
-        // Create a dict and push it onto the dict stack
         stack.push(Value::Int(10));
-        ds.op_dict(&mut stack).unwrap();  // stack now has Dict(10)
-        ds.op_begin(&mut stack).unwrap(); // dict stack grows
-
-        assert_eq!(ds.as_slice().len(), 2); // global + new dict
-
+        ds.op_dict(&mut stack).unwrap();
+        ds.op_begin(&mut stack).unwrap();
+        assert_eq!(ds.as_slice().len(), 2);
         ds.op_end().unwrap();
-        assert_eq!(ds.as_slice().len(), 1); // back to global only
+        assert_eq!(ds.as_slice().len(), 1);
     }
 }

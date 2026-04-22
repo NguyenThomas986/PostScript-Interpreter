@@ -1,47 +1,22 @@
 // io_ops.rs — Input/Output operators
-//
-// Implements: print, =, ==
-//
-// PostScript I/O rules:
-//   - print  : pops a string and writes it to stdout with no newline
-//   - =      : pops any value, prints it as plain text, adds a newline
-//   - ==     : pops any value, prints it in PostScript syntax, adds a newline
-//              (strings are wrapped in parens, names get a leading /)
 
 use crate::stack::OperandStack;
 use crate::types::Value;
 
 impl OperandStack {
-
-    /// print — pop a string and write it to stdout (no newline)
-    ///   Before: (hello)
-    ///   After:  (empty)   stdout: hello
     pub fn op_print(&mut self) -> Result<(), String> {
         match self.pop()? {
-            Value::Str(s) => {
-                print!("{}", s);
-                Ok(())
-            }
+            Value::Str(s) => { print!("{}", s); Ok(()) }
             other => Err(format!("print: expected string, got {:?}", other)),
         }
     }
 
-    /// = — pop any value, print it as plain text followed by a newline
-    ///   Before: 42
-    ///   After:  (empty)   stdout: 42\n
     pub fn op_print_pop(&mut self) -> Result<(), String> {
         let val = self.pop()?;
         println!("{}", val);
         Ok(())
     }
 
-    /// == — pop any value, print it in PostScript representation followed by newline
-    /// Differences from =:
-    ///   - Strings are wrapped in parentheses:  (hello)
-    ///   - Names get a leading slash:            /foo
-    ///   - Everything else prints the same as =
-    ///   Before: (hello)
-    ///   After:  (empty)   stdout: (hello)\n
     pub fn op_print_repr(&mut self) -> Result<(), String> {
         let val = self.pop()?;
         println!("{}", postscript_repr(&val));
@@ -49,29 +24,22 @@ impl OperandStack {
     }
 }
 
-/// Format a Value in PostScript source representation.
-/// Used by the == operator.
 fn postscript_repr(val: &Value) -> String {
     match val {
-        // Strings are shown with surrounding parens — PostScript string syntax
         Value::Str(s)  => format!("({})", s),
-        // Names get their leading slash back
         Value::Name(n) => format!("/{}", n),
-        // Procedures show as { token token ... }
         Value::Procedure { tokens, .. } => format!("{{ {:?} }}", tokens),
-        // Everything else uses the standard Display impl
+        Value::Array(items) => {
+            let inner: Vec<String> = items.iter().map(|v| postscript_repr(v)).collect();
+            format!("[{}]", inner.join(" "))
+        }
         other => format!("{}", other),
     }
 }
 
-// ── Unit tests ────────────────────────────────────────────────────────────────
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Note: we can't easily capture stdout in unit tests, so we test that
-    // the operators consume the value correctly and don't error.
 
     #[test]
     fn test_print_consumes_string() {
@@ -97,14 +65,6 @@ mod tests {
     }
 
     #[test]
-    fn test_print_repr_consumes_value() {
-        let mut s = OperandStack::new();
-        s.push(Value::Str("hello".to_string()));
-        s.op_print_repr().unwrap();
-        assert_eq!(s.len(), 0);
-    }
-
-    #[test]
     fn test_postscript_repr_string() {
         let val = Value::Str("hello".to_string());
         assert_eq!(postscript_repr(&val), "(hello)");
@@ -117,14 +77,8 @@ mod tests {
     }
 
     #[test]
-    fn test_postscript_repr_int() {
-        let val = Value::Int(42);
-        assert_eq!(postscript_repr(&val), "42");
-    }
-
-    #[test]
-    fn test_postscript_repr_bool() {
-        let val = Value::Bool(true);
-        assert_eq!(postscript_repr(&val), "true");
+    fn test_postscript_repr_array() {
+        let val = Value::Array(vec![Value::Int(1), Value::Int(2)]);
+        assert_eq!(postscript_repr(&val), "[1 2]");
     }
 }

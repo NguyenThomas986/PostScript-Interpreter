@@ -19,6 +19,8 @@
 ///   add         → Token::Name("add".to_string())
 ///   {           → Token::ProcStart
 ///   }           → Token::ProcEnd
+///   [           → Token::ArrayStart
+///   ]           → Token::ArrayEnd
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     /// A whole number, e.g. 42 or -7
@@ -45,6 +47,12 @@ pub enum Token {
 
     /// The `}` character — marks the end of a procedure body
     ProcEnd,
+
+    /// The `[` character — marks the beginning of an array literal
+    ArrayStart,
+
+    /// The `]` character — marks the end of an array literal
+    ArrayEnd,
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -67,32 +75,23 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
         let ch = chars[i];
 
         // ── Whitespace: skip ─────────────────────────────────────────────
-        if ch.is_whitespace() {
-            i += 1;
-            continue;
-        }
+        if ch.is_whitespace() { i += 1; continue; }
 
         // ── Comments: % … end-of-line — skip the whole line ─────────────
         if ch == '%' {
-            while i < n && chars[i] != '\n' {
-                i += 1;
-            }
+            while i < n && chars[i] != '\n' { i += 1; }
             continue;
         }
 
-        // ── Procedure start ──────────────────────────────────────────────
-        if ch == '{' {
-            tokens.push(Token::ProcStart);
-            i += 1;
-            continue;
-        }
+        // ── Procedure delimiters ─────────────────────────────────────────
+        if ch == '{' { tokens.push(Token::ProcStart);  i += 1; continue; }
+        if ch == '}' { tokens.push(Token::ProcEnd);    i += 1; continue; }
 
-        // ── Procedure end ────────────────────────────────────────────────
-        if ch == '}' {
-            tokens.push(Token::ProcEnd);
-            i += 1;
-            continue;
-        }
+        // ── Array literal delimiters ─────────────────────────────────────
+        // [ and ] are tokenized here; the interpreter handles collecting
+        // the evaluated elements into a Value::Array at execution time.
+        if ch == '[' { tokens.push(Token::ArrayStart); i += 1; continue; }
+        if ch == ']' { tokens.push(Token::ArrayEnd);   i += 1; continue; }
 
         // ── PostScript string literal  ( ... ) ───────────────────────────
         // Strings may contain nested balanced parentheses.
@@ -139,9 +138,9 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
 
 /// Read characters until a delimiter is hit, return the word and the new index.
 ///
-/// Delimiters are: whitespace, `(`, `)`, `{`, `}`, `%`
+/// Delimiters are: whitespace, `(`, `)`, `{`, `}`, `[`, `]`, `%`
 fn read_word(chars: &[char], start: usize, n: usize) -> (String, usize) {
-    let delimiters = |c: char| c.is_whitespace() || matches!(c, '(' | ')' | '{' | '}' | '%');
+    let delimiters = |c: char| c.is_whitespace() || matches!(c, '(' | ')' | '{' | '}' | '[' | ']' | '%');
     let mut end = start;
     while end < n && !delimiters(chars[end]) {
         end += 1;
@@ -164,19 +163,13 @@ fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize)
 
     while i < n {
         let c = chars[i];
-
         match c {
             // Nested open paren — include it in the string, increase depth
-            '(' => {
-                depth += 1;
-                s.push('(');
-                i += 1;
-            }
+            '(' => { depth += 1; s.push('('); i += 1; }
             // Close paren — either ends the string or closes a nested level
             ')' => {
                 depth -= 1;
                 if depth == 0 {
-                    // This is the matching close — do NOT include it, we're done
                     i += 1; // consume the ')'
                     return Ok((s, i));
                 } else {
@@ -189,12 +182,8 @@ fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize)
                 i += 1; // skip the backslash
                 if i < n {
                     let escaped = match chars[i] {
-                        'n'  => '\n',
-                        't'  => '\t',
-                        'r'  => '\r',
-                        '\\' => '\\',
-                        '('  => '(',
-                        ')'  => ')',
+                        'n'  => '\n', 't'  => '\t', 'r'  => '\r',
+                        '\\' => '\\', '('  => '(', ')'  => ')',
                         other => other, // unknown escape: keep the char as-is
                     };
                     s.push(escaped);
@@ -202,10 +191,7 @@ fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize)
                 }
             }
             // Ordinary character
-            other => {
-                s.push(other);
-                i += 1;
-            }
+            other => { s.push(other); i += 1; }
         }
     }
 
@@ -222,28 +208,15 @@ fn read_string(chars: &[char], start: usize, n: usize) -> Result<(String, usize)
 ///   4. Name     (everything else — operator or user-defined name)
 fn classify_word(word: &str) -> Token {
     // 1. Try integer first (avoids misclassifying "-3" as a float)
-    if let Ok(n) = word.parse::<i64>() {
-        return Token::Int(n);
-    }
-
+    if let Ok(n) = word.parse::<i64>() { return Token::Int(n); }
     // 2. Try float
-    if let Ok(f) = word.parse::<f64>() {
-        return Token::Float(f);
-    }
-
+    if let Ok(f) = word.parse::<f64>() { return Token::Float(f); }
     // 3. Boolean literals
-    if word == "true" {
-        return Token::Bool(true);
-    }
-    if word == "false" {
-        return Token::Bool(false);
-    }
-
+    if word == "true"  { return Token::Bool(true); }
+    if word == "false" { return Token::Bool(false); }
     // 4. Everything else is a name (operator or user variable)
     Token::Name(word.to_string())
 }
-
-// ── Unit tests ────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -275,7 +248,6 @@ mod tests {
 
     #[test]
     fn test_nested_string() {
-        // Nested parens inside a string should be preserved
         let tokens = tokenize("(a (b) c)").unwrap();
         assert_eq!(tokens, vec![Token::StringLit("a (b) c".to_string())]);
     }
@@ -307,15 +279,23 @@ mod tests {
     }
 
     #[test]
+    fn test_array_delimiters() {
+        let tokens = tokenize("[ 1 2 3 ]").unwrap();
+        assert_eq!(tokens, vec![
+            Token::ArrayStart,
+            Token::Int(1), Token::Int(2), Token::Int(3),
+            Token::ArrayEnd,
+        ]);
+    }
+
+    #[test]
     fn test_comment_skipped() {
-        // Everything after % on a line should be ignored
         let tokens = tokenize("42 % this is a comment\n 7").unwrap();
         assert_eq!(tokens, vec![Token::Int(42), Token::Int(7)]);
     }
 
     #[test]
     fn test_unterminated_string_error() {
-        // A string missing its closing ')' should return an Err
         assert!(tokenize("(oops").is_err());
     }
 }

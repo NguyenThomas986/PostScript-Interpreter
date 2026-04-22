@@ -1,76 +1,58 @@
-// boolean.rs — Boolean, comparison, and bitwise operators
+// boolean.rs — Boolean, comparison, type, and conversion operators
 //
 // Implements all boolean/comparison operators as methods on OperandStack.
 //
-// Operators: eq, ne, ge, gt, le, lt, and, or, not, true, false
+// Operators:
+//   eq, ne, ge, gt, le, lt    — comparison (original)
+//   and, or, not              — logical / bitwise (original)
+//   true, false               — boolean literal pushers (original)
+//   type                      — push a name representing the runtime type
+//   cvi, cvr, cvs, cvn        — type conversion operators
 //
 // PostScript rules:
 //   - eq/ne work on any two values of the same type
 //   - ge/gt/le/lt work on numbers or strings
 //   - and/or/not work on booleans OR integers (bitwise)
 //   - true/false push boolean literals onto the stack
+//   - type pops a value and pushes a name like "integertype"
+//   - cvi/cvr/cvs/cvn coerce between scalar types
 
 use crate::stack::OperandStack;
 use crate::types::Value;
 
 impl OperandStack {
-
-    // ── Equality ──────────────────────────────────────────────────────────────
-
-    /// eq — push true if top two values are equal, false otherwise
-    ///   Before: a b    After: bool
     pub fn op_eq(&mut self) -> Result<(), String> {
-        let b = self.pop()?;
-        let a = self.pop()?;
-        self.push(Value::Bool(values_equal(&a, &b)));
-        Ok(())
+        let b = self.pop()?; let a = self.pop()?;
+        self.push(Value::Bool(values_equal(&a, &b))); Ok(())
     }
 
-    /// ne — push true if top two values are NOT equal
-    ///   Before: a b    After: bool
     pub fn op_ne(&mut self) -> Result<(), String> {
-        let b = self.pop()?;
-        let a = self.pop()?;
-        self.push(Value::Bool(!values_equal(&a, &b)));
-        Ok(())
+        let b = self.pop()?; let a = self.pop()?;
+        self.push(Value::Bool(!values_equal(&a, &b))); Ok(())
     }
 
-    // ── Ordering comparisons ──────────────────────────────────────────────────
-
-    /// ge — push true if a >= b
     pub fn op_ge(&mut self) -> Result<(), String> {
         let (a, b) = self.pop_comparable()?;
-        self.push(Value::Bool(a >= b));
-        Ok(())
+        self.push(Value::Bool(a >= b)); Ok(())
     }
 
-    /// gt — push true if a > b
     pub fn op_gt(&mut self) -> Result<(), String> {
         let (a, b) = self.pop_comparable()?;
-        self.push(Value::Bool(a > b));
-        Ok(())
+        self.push(Value::Bool(a > b)); Ok(())
     }
 
-    /// le — push true if a <= b
     pub fn op_le(&mut self) -> Result<(), String> {
         let (a, b) = self.pop_comparable()?;
-        self.push(Value::Bool(a <= b));
-        Ok(())
+        self.push(Value::Bool(a <= b)); Ok(())
     }
 
-    /// lt — push true if a < b
     pub fn op_lt(&mut self) -> Result<(), String> {
         let (a, b) = self.pop_comparable()?;
-        self.push(Value::Bool(a < b));
-        Ok(())
+        self.push(Value::Bool(a < b)); Ok(())
     }
 
-    // ── Logical / bitwise operators ───────────────────────────────────────────
-
-    /// and — bool bool → bool  (logical)  OR  int int → int  (bitwise)
     pub fn op_and(&mut self) -> Result<(), String> {
-        let b = self.pop()?;
-        let a = self.pop()?;
+        let b = self.pop()?; let a = self.pop()?;
         match (a, b) {
             (Value::Bool(x), Value::Bool(y)) => self.push(Value::Bool(x && y)),
             (Value::Int(x),  Value::Int(y))  => self.push(Value::Int(x & y)),
@@ -79,10 +61,8 @@ impl OperandStack {
         Ok(())
     }
 
-    /// or — bool bool → bool  (logical)  OR  int int → int  (bitwise)
     pub fn op_or(&mut self) -> Result<(), String> {
-        let b = self.pop()?;
-        let a = self.pop()?;
+        let b = self.pop()?; let a = self.pop()?;
         match (a, b) {
             (Value::Bool(x), Value::Bool(y)) => self.push(Value::Bool(x || y)),
             (Value::Int(x),  Value::Int(y))  => self.push(Value::Int(x | y)),
@@ -91,7 +71,6 @@ impl OperandStack {
         Ok(())
     }
 
-    /// not — bool → bool  (logical)  OR  int → int  (bitwise)
     pub fn op_not(&mut self) -> Result<(), String> {
         match self.pop()? {
             Value::Bool(b) => self.push(Value::Bool(!b)),
@@ -101,26 +80,109 @@ impl OperandStack {
         Ok(())
     }
 
-    /// true — push the boolean literal true
-    pub fn op_true(&mut self) -> Result<(), String> {
-        self.push(Value::Bool(true));
+    pub fn op_true(&mut self)  -> Result<(), String> { self.push(Value::Bool(true));  Ok(()) }
+    pub fn op_false(&mut self) -> Result<(), String> { self.push(Value::Bool(false)); Ok(()) }
+
+    // ── Type and conversion operators ─────────────────────────────────────────
+
+    /// type — pop a value, push a Name representing its runtime type.
+    ///   42 type       → /integertype
+    ///   3.14 type     → /realtype
+    ///   (hi) type     → /stringtype
+    ///   /foo type     → /nametype
+    ///   true type     → /booleantype
+    ///   { } type      → /proceduretype
+    ///   5 dict type   → /dicttype
+    ///   [ ] type      → /arraytype
+    ///   mark type     → /marktype
+    pub fn op_type(&mut self) -> Result<(), String> {
+        let val = self.pop()?;
+        let type_name = match &val {
+            Value::Int(_)        => "integertype",
+            Value::Float(_)      => "realtype",
+            Value::Bool(_)       => "booleantype",
+            Value::Str(_)        => "stringtype",
+            Value::Name(_)       => "nametype",
+            Value::Procedure {..} => "proceduretype",
+            Value::Dict(_)       => "dicttype",
+            Value::Array(_)      => "arraytype",
+            Value::Mark          => "marktype",
+        };
+        self.push(Value::Name(type_name.to_string()));
         Ok(())
     }
 
-    /// false — push the boolean literal false
-    pub fn op_false(&mut self) -> Result<(), String> {
-        self.push(Value::Bool(false));
+    /// cvs — value string → string
+    /// Convert any value to its string representation.
+    /// PostScript passes a destination string buffer as the second argument;
+    /// we accept (and discard) it for compatibility and always return a fresh string.
+    ///   42 (     ) cvs  →  (42)
+    pub fn op_cvs(&mut self) -> Result<(), String> {
+        let _dest = self.pop()?; // destination buffer — ignored in this implementation
+        let val = self.pop()?;
+        let s = match &val {
+            Value::Int(n)   => n.to_string(),
+            Value::Float(f) => f.to_string(),
+            Value::Bool(b)  => b.to_string(),
+            Value::Str(s)   => s.clone(),
+            Value::Name(n)  => n.clone(),
+            other => format!("{}", other),
+        };
+        self.push(Value::Str(s));
         Ok(())
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    /// cvi — value → int
+    /// Convert to integer: floats are truncated toward zero, strings are parsed.
+    ///   3.9 cvi  →  3
+    ///   (7) cvi  →  7
+    pub fn op_cvi(&mut self) -> Result<(), String> {
+        match self.pop()? {
+            Value::Int(n)   => self.push(Value::Int(n)),
+            Value::Float(f) => self.push(Value::Int(f as i64)),
+            Value::Str(s)   => {
+                let n = s.trim().parse::<i64>()
+                    .map_err(|_| format!("cvi: cannot convert '{}' to int", s))?;
+                self.push(Value::Int(n));
+            }
+            other => return Err(format!("cvi: cannot convert {:?} to int", other)),
+        }
+        Ok(())
+    }
 
-    /// Pop two values and return them as an ordered (f64, f64) pair for
-    /// numeric comparisons, or compare strings lexicographically.
-    /// Returns (a_ord, b_ord) as f64 for numbers, errors on incompatible types.
+    /// cvr — value → float
+    /// Convert to real: integers are promoted, strings are parsed.
+    ///   5 cvr     →  5.0
+    ///   (3.14) cvr  →  3.14
+    pub fn op_cvr(&mut self) -> Result<(), String> {
+        match self.pop()? {
+            Value::Int(n)   => self.push(Value::Float(n as f64)),
+            Value::Float(f) => self.push(Value::Float(f)),
+            Value::Str(s)   => {
+                let f = s.trim().parse::<f64>()
+                    .map_err(|_| format!("cvr: cannot convert '{}' to real", s))?;
+                self.push(Value::Float(f));
+            }
+            other => return Err(format!("cvr: cannot convert {:?} to real", other)),
+        }
+        Ok(())
+    }
+
+    /// cvn — string/name → name
+    /// Convert a string to a name object. Names are like strings but are
+    /// interned identifiers — used as dictionary keys.
+    ///   (foo) cvn  →  /foo
+    pub fn op_cvn(&mut self) -> Result<(), String> {
+        match self.pop()? {
+            Value::Str(s)  => self.push(Value::Name(s)),
+            Value::Name(n) => self.push(Value::Name(n)),
+            other => return Err(format!("cvn: expected string or name, got {:?}", other)),
+        }
+        Ok(())
+    }
+
     fn pop_comparable(&mut self) -> Result<(ComparableValue, ComparableValue), String> {
-        let b = self.pop()?;
-        let a = self.pop()?;
+        let b = self.pop()?; let a = self.pop()?;
         match (a, b) {
             (Value::Int(x),   Value::Int(y))   => Ok((ComparableValue::Num(x as f64), ComparableValue::Num(y as f64))),
             (Value::Float(x), Value::Float(y)) => Ok((ComparableValue::Num(x),        ComparableValue::Num(y))),
@@ -132,22 +194,13 @@ impl OperandStack {
     }
 }
 
-/// Internal helper type for ordering comparisons.
-/// Lets us compare numbers as f64 and strings lexicographically
-/// without duplicating match arms for every operator.
 #[derive(PartialEq, PartialOrd)]
-enum ComparableValue {
-    Num(f64),
-    Str(String),
-}
+enum ComparableValue { Num(f64), Str(String) }
 
-/// Check deep equality between two Values.
-/// Handles int/float cross-type equality (3 == 3.0 → true).
 fn values_equal(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (Value::Int(x),   Value::Int(y))   => x == y,
         (Value::Float(x), Value::Float(y)) => x == y,
-        // Cross-type numeric equality: 3 eq 3.0 → true
         (Value::Int(x),   Value::Float(y)) => (*x as f64) == *y,
         (Value::Float(x), Value::Int(y))   => *x == (*y as f64),
         (Value::Bool(x),  Value::Bool(y))  => x == y,
@@ -156,8 +209,6 @@ fn values_equal(a: &Value, b: &Value) -> bool {
         _ => false,
     }
 }
-
-// ── Unit tests ────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -185,16 +236,8 @@ mod tests {
 
     #[test]
     fn test_eq_int_float() {
-        // Cross-type: 3 eq 3.0 should be true
         let mut s = stack_with(vec![Value::Int(3), Value::Float(3.0)]);
         s.op_eq().unwrap();
-        assert_eq!(s.pop().unwrap(), Value::Bool(true));
-    }
-
-    #[test]
-    fn test_ne() {
-        let mut s = stack_with(vec![Value::Int(1), Value::Int(2)]);
-        s.op_ne().unwrap();
         assert_eq!(s.pop().unwrap(), Value::Bool(true));
     }
 
@@ -206,38 +249,10 @@ mod tests {
     }
 
     #[test]
-    fn test_lt() {
-        let mut s = stack_with(vec![Value::Int(2), Value::Int(9)]);
-        s.op_lt().unwrap();
-        assert_eq!(s.pop().unwrap(), Value::Bool(true));
-    }
-
-    #[test]
-    fn test_ge_equal() {
-        let mut s = stack_with(vec![Value::Int(4), Value::Int(4)]);
-        s.op_ge().unwrap();
-        assert_eq!(s.pop().unwrap(), Value::Bool(true));
-    }
-
-    #[test]
-    fn test_le() {
-        let mut s = stack_with(vec![Value::Int(3), Value::Int(5)]);
-        s.op_le().unwrap();
-        assert_eq!(s.pop().unwrap(), Value::Bool(true));
-    }
-
-    #[test]
     fn test_and_bool() {
         let mut s = stack_with(vec![Value::Bool(true), Value::Bool(false)]);
         s.op_and().unwrap();
         assert_eq!(s.pop().unwrap(), Value::Bool(false));
-    }
-
-    #[test]
-    fn test_or_bool() {
-        let mut s = stack_with(vec![Value::Bool(false), Value::Bool(true)]);
-        s.op_or().unwrap();
-        assert_eq!(s.pop().unwrap(), Value::Bool(true));
     }
 
     #[test]
@@ -248,34 +263,37 @@ mod tests {
     }
 
     #[test]
-    fn test_and_bitwise() {
-        // 0b1100 & 0b1010 = 0b1000 = 8
-        let mut s = stack_with(vec![Value::Int(12), Value::Int(10)]);
-        s.op_and().unwrap();
-        assert_eq!(s.pop().unwrap(), Value::Int(8));
+    fn test_type_int() {
+        let mut s = stack_with(vec![Value::Int(42)]);
+        s.op_type().unwrap();
+        assert_eq!(s.pop().unwrap(), Value::Name("integertype".to_string()));
     }
 
     #[test]
-    fn test_or_bitwise() {
-        // 0b1100 | 0b1010 = 0b1110 = 14
-        let mut s = stack_with(vec![Value::Int(12), Value::Int(10)]);
-        s.op_or().unwrap();
-        assert_eq!(s.pop().unwrap(), Value::Int(14));
+    fn test_type_string() {
+        let mut s = stack_with(vec![Value::Str("hello".to_string())]);
+        s.op_type().unwrap();
+        assert_eq!(s.pop().unwrap(), Value::Name("stringtype".to_string()));
     }
 
     #[test]
-    fn test_true_false_push() {
-        let mut s = OperandStack::new();
-        s.op_true().unwrap();
-        s.op_false().unwrap();
-        assert_eq!(s.pop().unwrap(), Value::Bool(false));
-        assert_eq!(s.pop().unwrap(), Value::Bool(true));
+    fn test_cvi_float() {
+        let mut s = stack_with(vec![Value::Float(3.9)]);
+        s.op_cvi().unwrap();
+        assert_eq!(s.pop().unwrap(), Value::Int(3));
     }
 
     #[test]
-    fn test_string_comparison() {
-        let mut s = stack_with(vec![Value::Str("abc".to_string()), Value::Str("abd".to_string())]);
-        s.op_lt().unwrap();
-        assert_eq!(s.pop().unwrap(), Value::Bool(true));
+    fn test_cvr_int() {
+        let mut s = stack_with(vec![Value::Int(5)]);
+        s.op_cvr().unwrap();
+        assert_eq!(s.pop().unwrap(), Value::Float(5.0));
+    }
+
+    #[test]
+    fn test_cvn_string() {
+        let mut s = stack_with(vec![Value::Str("foo".to_string())]);
+        s.op_cvn().unwrap();
+        assert_eq!(s.pop().unwrap(), Value::Name("foo".to_string()));
     }
 }

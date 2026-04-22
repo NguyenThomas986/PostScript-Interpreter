@@ -1,10 +1,3 @@
-// main.rs — Entry point and REPL
-//
-// Only responsibility: read lines from stdin, hand them to the interpreter,
-// and print the resulting stack. No operator logic lives here.
-//
-// Modules are declared in lib.rs and shared with integration tests.
-
 use postscript_interpreter::interpreter::Interpreter;
 use std::io::{self, BufRead, Write};
 
