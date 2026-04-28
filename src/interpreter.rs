@@ -400,19 +400,41 @@ impl Interpreter {
             "quit" => self.op_quit(),
 
             // ── Scoping toggle ────────────────────────────────────────────────
-            // Flipping use_lexical_scoping to true means that from this point
-            // forward, any new { } procedure block will have a snapshot of the
-            // current dictionary stack embedded in it at parse time. Procedures
-            // that were already defined before this toggle are not affected —
-            // they retain whatever captured_env (or lack thereof) they were
-            // created with. This is why `lexical` must appear in the source
-            // before the procedure definitions you want to capture lexically.
+            // `lexical` flips the flag so that any { } block defined from this
+            // point forward will have a snapshot of the current dict stack
+            // embedded inside it at parse time. Procedures defined before this
+            // toggle are not affected — they keep whatever captured_env they
+            // already have. This is why `lexical` must appear before the
+            // procedure definitions you want to behave lexically.
             "lexical" => {
                 self.use_lexical_scoping = true;
+                // Re-snapshot all existing procedures so they immediately
+                // resolve names against the current environment, not the
+                // live stack at call time.
+                self.dicts.stamp_captured_envs();
                 Ok(())
             }
+
+            // `dynamic` does two things:
+            //   1. Flips the flag so future { } blocks get no snapshot.
+            //   2. Walks every dict on the stack and strips captured_env out
+            //      of every procedure it finds.
+            //
+            // Step 2 is necessary because without it a procedure like foo that
+            // was defined under lexical scoping would keep its snapshot and
+            // keep running lexically even after `dynamic` is called. The TA
+            // demo requires that `dynamic` followed by `20 foo` produces 40
+            // (live stack lookup finds x=20), not 30 (snapshot lookup finds
+            // x=10). Stripping captured_env from existing procedures makes
+            // them fall back to the live stack on their next call, which is
+            // exactly dynamic scoping behavior.
             "dynamic" => {
                 self.use_lexical_scoping = false;
+                // Walk every dictionary on the stack and clear captured_env
+                // from every procedure value stored there.
+                // Delegate to DictStack so we don't need to expose the
+                // internal `stack` field outside of dictionary.rs.
+                self.dicts.strip_captured_envs();
                 Ok(())
             }
 

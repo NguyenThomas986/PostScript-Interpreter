@@ -132,6 +132,41 @@ impl DictStack {
     pub fn as_slice(&self) -> &[Dict] {
         &self.stack
     }
+
+    /// Strip captured_env from every procedure stored in any dictionary on
+    /// the stack.
+    ///
+    /// Called when the interpreter switches to dynamic scoping mode. Without
+    /// this, procedures defined under lexical scoping would keep their captured
+    /// snapshot and continue resolving names against it even after `dynamic` is
+    /// called. Setting captured_env to None makes execute_procedure fall back to
+    /// the live dictionary stack at call time — dynamic scoping behavior.
+    pub fn strip_captured_envs(&mut self) {
+        for dict in self.stack.iter_mut() {
+            for val in dict.entries.values_mut() {
+                if let Value::Procedure { captured_env, .. } = val {
+                    *captured_env = None;
+                }
+            }
+        }
+    }
+    pub fn stamp_captured_envs(&mut self) {
+        // Take a snapshot of the current dict stack — this is the
+        // definition-time environment we want all existing procedures
+        // to use when lexical scoping is active.
+        let snapshot = self.snapshot();
+        for dict in self.stack.iter_mut() {
+            for val in dict.entries.values_mut() {
+                if let Value::Procedure { captured_env, .. } = val {
+                    // Overwrite whatever was there (None from a previous
+                    // `dynamic` call, or an old snapshot) with the current
+                    // live stack. Now execute_procedure will swap this in
+                    // and all name lookups will hit current bindings.
+                    *captured_env = Some(snapshot.clone());
+                }
+            }
+        }
+    }
 }
 
 use crate::stack::OperandStack;
